@@ -2,6 +2,7 @@ const frontmatterPattern = /^---\n(?:.*\n)*---\n\n/
 const hexColorPattern = /^#[0-9A-F]{6}$/i
 
 const appState = {
+	noteData: {},
 	shelf: {
 		order: [],
 		objs: {},
@@ -61,7 +62,23 @@ const writeNoteToPage = (noteData) => {
 		noteTitleDiv.innerHTML = noteData.params.title
 		const colorValues = getNoteColorValues(noteData.params.color)
 		noteContainerDiv.style.backgroundColor = colorValues
+
+		tagsTextDiv.innerHTML = formatTagsHTML(noteData.params)
 	}
+}
+
+// Later, `tag` will refer to something more specific. For now, I'm just going
+// to show all front matter params.
+const formatTagsHTML = (params) => {
+	// This implementation would be inefficient in some languages depending on
+	// string concatenation behavior.
+	// TODO: Look into whether this is relevant here.
+	var tagsHTML = 'Tags:<ul>'
+	for (const key in params) {
+		tagsHTML += `<li>${key}: ${params[key]}</li>`
+	}
+	tagsHTML += '</ul>'
+	return tagsHTML
 }
 
 const getNoteColorValues = (colorString) => {
@@ -126,6 +143,7 @@ const noteTextDiv = document.getElementById('note_text')
 const noteTitleDiv = document.getElementById('note_title')
 const noteContainerDiv = document.getElementById('note_container')
 const shelfDiv = document.getElementById('side_panel')
+const tagsTextDiv = document.getElementById('tags_text')
 shuffleButton.onclick = requestRandomNote
 pinButton.onclick = pinNote
 
