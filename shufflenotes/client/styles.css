@@ -1,0 +1,56 @@
+.flex_container {
+	display: flex;
+}
+
+#main_container {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 100%;
+}
+
+#side_panel {
+	/*border: 1px solid gray;*/
+	flex-basis: 200px;
+	border-right: 1px solid gray;
+	flex-grow: 1;
+	flex-shrink: 1;
+	word-wrap: break-word;
+}
+
+#shuffle_area {
+	/*border: 1px solid red;*/
+	flex-grow: 5;
+	flex-shrink: 5;
+	padding: 10px;
+}
+
+#note_title {
+	font-size: large;
+	font-weight: bold;
+	font-family: Futura;
+}
+
+#note_container {
+	margin: auto;
+	width: 400px;
+	border: 1px solid gray;
+	padding: 10px;
+	border-radius: 5px;
+}
+
+#note_text {
+	font-family: Verdana;
+	font-size: small;
+}
+
+#button_container {
+	/*border:  1px solid green;*/
+	margin: auto;
+	width: 400px;
+}
+
+button {
+	border: 0px;
+	background-color: transparent;
+}
