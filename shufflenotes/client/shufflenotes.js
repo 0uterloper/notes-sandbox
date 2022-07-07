@@ -4,8 +4,9 @@ const hexColorPattern = /^#[0-9A-F]{6}$/i
 const appState = {
 	noteData: {},
 	shelf: {
-		order: [],
-		objs: {},
+		order: [],     // Ordered list of titles.
+		params: {},    // Mapping of titles => params objects.
+		elements: {},  // Mapping of titles => DOM elements
 	},
 }
 
@@ -110,30 +111,91 @@ const isEmpty = (obj) => Object.keys(obj).length === 0
 const pinNote = () => {
 	constructShelfEntry(
 		appState.noteData.params.title, appState.noteData.params.color)
+	saveLocalStorageState()
+}
+
+const makeDeletePinFunction = (title) => {
+	const deletePin = () => {
+		// Making assumption that title is exactly once in shelf. This is 
+		// currently correct, but could break if state structure changes.
+		// const shelfEntries = shelfDiv.children
+		// for (var i = 0; i < shelfEntries; i++) {
+		// 	const element = shelfEntries[i]
+		// 	const candidateTitle = element.children[0]
+		// 	if (element) {
+				
+		// 		break
+		// 	}
+		// }
+		// shelfDiv.
+		shelfDiv.removeChild(appState.shelf.elements[title])
+		appState.shelf.order = appState.shelf.order.filter((t) => t !== title)
+		delete appState.shelf.params[title]
+		delete appState.shelf.elements[title]
+		saveLocalStorageState()
+	}
+	return deletePin
 }
 
 const constructShelfEntry = (title, color) => {
 	if (appState.shelf.order.includes(title)) {
 
 	} else {
+		const entryContainer = document.createElement('div')
+		entryContainer.style.backgroundColor = getNoteColorValues(color)
+		entryContainer.classList.add('flex_container')
+		
+		const deleteButton = document.createElement('button')
+		deleteButton.innerHTML = '❌'
+		deleteButton.onclick = makeDeletePinFunction(title)
+		entryContainer.appendChild(deleteButton)
+
 		const entry = document.createElement('div')
-		entry.style.backgroundColor = getNoteColorValues(color)
 		entry.onclick = makeLoadNoteFunction(title)
+		const titleText = document.createTextNode(title)
+		entry.appendChild(titleText)	
+		entryContainer.appendChild(entry)
 
 		appState.shelf.order.push(title)
-		appState.shelf.objs[title] = entry
+		appState.shelf.params[title] = {
+			color: color,
+		}
+		appState.shelf.elements[title] = entryContainer
 
-		const titleText = document.createTextNode(title)
-		entry.appendChild(titleText)
-		shelfDiv.appendChild(entry)
+		shelfDiv.appendChild(entryContainer)
 	}
 }
 
 const makeLoadNoteFunction = (title) => {
-	const loadNoteFromShelf = (event) => {
+	const loadNoteFromShelf = () => {
 		requestSpecificNote(title)
 	}
 	return loadNoteFromShelf
+}
+
+const saveLocalStorageState = () => {
+	localStorage.shelf = JSON.stringify(appState.shelf)
+}
+
+const loadLocalStorageState = () => {
+	console.log(localStorage)
+	console.log(localStorage.shelf)
+	if (localStorage.shelf !== undefined) {
+		const shelf = JSON.parse(localStorage.shelf)
+		// Currently unnecessary but might matter later.
+		resetShelf()
+		shelf.order.forEach((title) => {
+			constructShelfEntry(title, shelf.params[title].color)
+		})
+	}
+}
+
+const resetShelf = () => {
+	appState.shelf = {
+		order: [],
+		params: {},
+		elements: {},
+	}
 }
 
 
@@ -144,7 +206,9 @@ const noteTitleDiv = document.getElementById('note_title')
 const noteContainerDiv = document.getElementById('note_container')
 const shelfDiv = document.getElementById('side_panel')
 const tagsTextDiv = document.getElementById('tags_text')
+
 shuffleButton.onclick = requestRandomNote
 pinButton.onclick = pinNote
 
+loadLocalStorageState()
 requestRandomNote()
