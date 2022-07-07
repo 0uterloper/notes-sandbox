@@ -1,9 +1,9 @@
 # notes-sandbox
 
 ## Priorities
-1. **Ramp up on web dev and general maker/hacker mindset**. Just get things working. Make them elegant later, iff it would be valuable. Accepting the right (nonzero) amount of technical debt is a critical meta-systemic tool that I want to grow. And like, figure out what HTTP is and stuff.
+1. **Ramp up on web dev and general maker/hacker mindset**. Just get things working. Make them elegant later, iff it would be valuable. Accepting the right (nonzero) amount of technical debt is a critical meta-systemic skill that I want to grow. And like, figure out what HTTP is and stuff.
 2. **Build useful and fun things for myself**. I have ~thousands of markdown notes flatly stored in a folder. A lot of them have good ideas or funny jokes or whatever, and are functionally inaccessible in their current position. Tap this goldmine.
-3. **Use [Braid](braid.org)**. I'm sold on their vision and socially intertwined with the team, and I want to learn their paradigm and framework for my own sake while also being a user test case for learning it without already being a web expert.
+3. **Use [Braid](https://braid.org/)**. I'm sold on their vision and socially intertwined with the team, and I want to learn their paradigm and framework for my own sake while also being a user test case for learning it without already being a web expert.
 4. **Build a useful sandbox for other people**. I have conversations all the time with people who put a lot of effort into their PKM models. It would be great to remove a bunch of the friction upstream of building something for yourself. Like uh, make a Twitter bot that auto-tweets from a folder in your Obsidian storage that does something cutesy with your internal links... or something.
 5. **Build useful and fun things for other people**. Of course, if I stumble across an idea that I find _exceptionally_ useful or fun, I might clean it up and evangelize it a bit. Host it on a website somewhere where people can sync their Roam graph and use my thing with that data without having to look at code, maybe.
 
