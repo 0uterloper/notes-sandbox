@@ -15,6 +15,8 @@ dom.MAIN_CONTAINER = ->
 dom.SIDE_PANEL = ->
   DIV {},
     id: 'side_panel'
+    for title in state.shelf
+      SHELF_ENTRY title
 
 dom.SHUFFLE_AREA = ->
   DIV {},
@@ -39,6 +41,7 @@ dom.BUTTON_CONTAINER = ->
       flex: '0 0 10px'
       BUTTON {},
         id: 'pin_button'
+        onClick: pin_note
 
 dom.NOTE_CONTAINER = ->
   DIV {},
@@ -61,9 +64,23 @@ dom.TAGS_CONTAINER = ->
         if state.note_data?
           LI "#{k}: #{v}" for k, v of JSON.parse state.note_data.params
 
+SHELF_ENTRY = (title) ->
+  DIV {},
+    display: 'flex'
+    BUTTON {},
+      color: 'red'
+      onClick: => unpin_note title
+      'x'
+    DIV {},
+      onClick: => request_specific_note title
+      title
+
 request_random_note = ->
   # Not yet implementing SB6 on server; still using XHR for now.
   make_get_request('/random_note')
+
+request_specific_note = (title) ->
+  make_get_request "/note=#{title}"
 
 make_get_request = (url) ->
   req = new XMLHttpRequest()
@@ -94,5 +111,18 @@ parse_params = (params_strings) ->
   (result[k] = v) for [k, v] in params_pairs
   result
 
+# This will not work for a note with no title.
+# TODO: Catch no-title case or enforce invariant.
+pin_note = ->
+  title = state.note_data.params.title
+  if not state.shelf.includes title
+    state.shelf.push title
 
+unpin_note = (title) ->
+  state.shelf = (t for t in state.shelf when t != title)
+
+reset_state = ->
+  state.shelf = []
+
+reset_state()
 request_random_note()
