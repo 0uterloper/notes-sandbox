@@ -15,8 +15,8 @@ dom.MAIN_CONTAINER = ->
 dom.SIDE_PANEL = ->
   DIV {},
     id: 'side_panel'
-    for title in state.shelf
-      SHELF_ENTRY title
+    for entry in state.shelf
+      SHELF_ENTRY entry
 
 dom.SHUFFLE_AREA = ->
   DIV {},
@@ -46,6 +46,8 @@ dom.BUTTON_CONTAINER = ->
 dom.NOTE_CONTAINER = ->
   DIV {},
     id: 'note_container'
+    backgroundColor: if state.note_data? 
+      get_color_values state.note_data.params.color
     DIV {},
       id: 'note_title'
       if state.note_data? then state.note_data.params.title ? ''
@@ -64,16 +66,17 @@ dom.TAGS_CONTAINER = ->
         if state.note_data?
           LI "#{k}: #{v}" for k, v of JSON.parse state.note_data.params
 
-SHELF_ENTRY = (title) ->
+SHELF_ENTRY = (entry) ->
   DIV {},
     display: 'flex'
+    backgroundColor: get_color_values entry.color
     BUTTON {},
       color: 'red'
-      onClick: => unpin_note title
+      onClick: => unpin_note entry.title
       'x'
     DIV {},
-      onClick: => request_specific_note title
-      title
+      onClick: => request_specific_note entry.title
+      entry.title
 
 request_random_note = ->
   # Not yet implementing SB6 on server; still using XHR for now.
@@ -115,14 +118,37 @@ parse_params = (params_strings) ->
 # TODO: Catch no-title case or enforce invariant.
 pin_note = ->
   title = state.note_data.params.title
-  if not state.shelf.includes title
-    state.shelf.push title
+  color = state.note_data.params.color
+  if not state.shelf.some((entry) -> entry.title == title)
+    state.shelf.push
+      title: title
+      color: color
 
 unpin_note = (title) ->
-  state.shelf = (t for t in state.shelf when t != title)
+  state.shelf = (entry for entry in state.shelf when entry.title != title)
 
 reset_state = ->
   state.shelf = []
+
+get_color_values = (color_string) ->
+  default_color = '#ffffff'
+  color_map =
+    red: '#E59086'
+    orange: '#F2BE42'
+    yellow: '#FEF388'
+    green: '#D6FD9D'
+    teal: '#B9FDEC'
+    blue: '#D1EFF7'
+    darkblue: '#B3CBF6'
+    purple: '#D0B1F6'
+    pink: '#F7D1E7'
+    brown: '#E1CAAC'
+    gray: '#E8EAED'
+    default: default_color
+
+  if not color_string? then default_color
+  else if HEX_COLOR_PATTERN.test(color_string) then color_string
+  else color_map[color_string.replaceAll(' ', '').toLowerCase()]
 
 reset_state()
 request_random_note()
