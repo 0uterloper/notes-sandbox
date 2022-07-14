@@ -15,8 +15,9 @@ dom.MAIN_CONTAINER = ->
 dom.SIDE_PANEL = ->
   DIV {},
     id: 'side_panel'
-    for entry in state.shelf
-      SHELF_ENTRY entry
+    for entry in state['ls/shelf'] ? []
+      SHELF_ENTRY
+        entry: entry
 
 dom.SHUFFLE_AREA = ->
   DIV {},
@@ -46,15 +47,15 @@ dom.BUTTON_CONTAINER = ->
 dom.NOTE_CONTAINER = ->
   DIV {},
     id: 'note_container'
-    backgroundColor: if state.note_data? 
-      get_color_values state.note_data.params.color
+    backgroundColor: if state['ls/note_data']? 
+      get_color_values state['ls/note_data'].params.color
     DIV {},
       id: 'note_title'
-      if state.note_data? then state.note_data.params.title ? ''
+      if state['ls/note_data']? then state['ls/note_data'].params.title ? ''
     BR()
     DIV {},
       id: 'note_text'
-      if state.note_data? then state.note_data.content
+      if state['ls/note_data']? then state['ls/note_data'].content
 
 dom.TAGS_CONTAINER = ->
   DIV {},
@@ -63,10 +64,10 @@ dom.TAGS_CONTAINER = ->
       id: 'tags_text'
       'Tags:'
       UL {},
-        if state.note_data?
-          LI "#{k}: #{v}" for k, v of JSON.parse state.note_data.params
+        if state['ls/note_data']?
+          LI "#{k}: #{v}" for k, v of JSON.parse state['ls/note_data'].params
 
-SHELF_ENTRY = (entry) ->
+dom.SHELF_ENTRY = (entry) ->
   DIV {},
     display: 'flex'
     backgroundColor: get_color_values entry.color
@@ -91,7 +92,7 @@ make_get_request = (url) ->
   req.send()
   req.onloadend = =>
     note_data = parse_raw_note_md(req.responseText.trim())
-    state.note_data = note_data
+    state['ls/note_data'] = note_data
 
 parse_raw_note_md = (raw_md) =>
   has_frontmatter = FRONTMATTER_PATTERN.test(raw_md)
@@ -117,18 +118,20 @@ parse_params = (params_strings) ->
 # This will not work for a note with no title.
 # TODO: Catch no-title case or enforce invariant.
 pin_note = ->
-  title = state.note_data.params.title
-  color = state.note_data.params.color
-  if not state.shelf.some((entry) -> entry.title == title)
-    state.shelf.push
+  title = state['ls/note_data'].params.title
+  color = state['ls/note_data'].params.color
+  if not state['ls/shelf'].some((entry) -> entry.title == title)
+    state['ls/shelf'].push
       title: title
       color: color
 
 unpin_note = (title) ->
-  state.shelf = (entry for entry in state.shelf when entry.title != title)
+  state['ls/shelf'] =
+    (entry for entry in state['ls/shelf'] when entry.title != title)
 
-reset_state = ->
-  state.shelf = []
+init_state = ->
+  if not state['ls/note_data']? then request_random_note()
+  state['ls/shelf'] ?= []
 
 get_color_values = (color_string) ->
   default_color = '#ffffff'
@@ -150,5 +153,4 @@ get_color_values = (color_string) ->
   else if HEX_COLOR_PATTERN.test(color_string) then color_string
   else color_map[color_string.replaceAll(' ', '').toLowerCase()]
 
-reset_state()
-request_random_note()
+init_state()
