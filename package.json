@@ -1,5 +1,6 @@
 {
   "devDependencies": {
-    "coffeescript": "^2.7.0"
+    "coffeescript": "^2.7.0",
+    "statebus": "^6.1.22"
   }
 }

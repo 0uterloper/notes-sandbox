@@ -110,8 +110,22 @@ dom.SHELF_ENTRY = function(entry) {
 };
 
 request_random_note = function() {
+  var _, note, obj, options;
   // Not yet implementing SB6 on server; still using XHR for now.
-  return make_get_request('/random_note');
+  options = (function() {
+    var ref, results;
+    ref = state['/notes'].children;
+    results = [];
+    for (_ in ref) {
+      obj = ref[_];
+      if (!obj.is_dir) {
+        results.push(obj);
+      }
+    }
+    return results;
+  })();
+  note = options[Math.floor(Math.random() * options.length)];
+  return state['ls/note_data'] = parse_raw_note_md(note.content.trim());
 };
 
 request_specific_note = function(title) {

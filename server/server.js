@@ -2,11 +2,12 @@ const fs = require('fs')
 const http = require('http')
 const path = require('path')
 const url = require('url')
+const bus = require('statebus').serve({port: 3006})
 
 const hostname = '127.0.0.1'
 const port = 3000
 
-const rootDir = './server/storage/'
+const rootDir = './storage/'
 const mdDir = path.join(rootDir, 'markdown')
 const keepDir = path.join(mdDir, 'keep')
 

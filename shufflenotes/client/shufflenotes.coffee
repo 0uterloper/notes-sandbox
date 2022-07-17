@@ -81,7 +81,10 @@ dom.SHELF_ENTRY = (entry) ->
 
 request_random_note = ->
   # Not yet implementing SB6 on server; still using XHR for now.
-  make_get_request('/random_note')
+  options = 
+    (obj for _, obj of state['/notes'].children when not obj.is_dir)
+  note = options[Math.floor(Math.random() * options.length)]
+  state['ls/note_data'] = parse_raw_note_md(note.content.trim())
 
 request_specific_note = (title) ->
   make_get_request "/note=#{title}"
