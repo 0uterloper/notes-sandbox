@@ -1,7 +1,7 @@
 const fs = require('fs')
 const http = require('http')
 const path = require('path')
-const bus = require('statebus').serve()
+const bus = require('statebus').serve({file_store:false})
 bus.net_mount('/*', 'http://localhost:3006')
 
 const fs_root = '/Users/davisfoote/Documents/obsidian/Personal notes/'

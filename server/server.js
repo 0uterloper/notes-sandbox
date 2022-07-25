@@ -4,6 +4,8 @@ const path = require('path')
 const url = require('url')
 const bus = require('statebus').serve({port: 3006})
 
+bus.http.use('/static', require('express').static('static'))
+
 const hostname = '127.0.0.1'
 const port = 3000
 
