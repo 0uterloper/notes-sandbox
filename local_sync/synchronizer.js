@@ -15,13 +15,16 @@ const save_note = (rel_path) => {
 	const key = note_key_prefix + hash_filepath(rel_path)
 	const content = fs.readFileSync(abs_path, 'utf8')
 
-	const note_obj = {
+	const note_obj = bus.fetch(key)
+	Object.assign(note_obj, {
 		content: content,
 		location: rel_path,
-	}
-	bus.state[key] = note_obj
-	console.log(bus.state['/all_notes']())
-	bus.state['/all_notes'].notes[key] = note_obj
+	})
+	bus.save(note_obj)
+
+	const all_notes = bus.fetch('/all_notes')
+	all_notes.list.push(key)
+	bus.save(all_notes)
 }
 
 const hash_filepath = (rel_path) => {
@@ -43,6 +46,11 @@ const recursive_save = (rel_path = '.') => {
 	}
 }
 
+const init_state = () => {
+	const all_notes = bus.fetch('/all_notes')
+	all_notes.list = []
+	bus.save(all_notes)
+}
 
 // Utils
 
@@ -61,7 +69,7 @@ const is_md = filepath => path.extname(filepath) === '.md'
 // Execution
 
 // Start with a full send over. This avoids more complicated diffing for now.
-bus.state['/all_notes'] = {notes: {}}
+init_state()
 recursive_save()
 
 // Watch source for changes and keep server synchronized with source.
