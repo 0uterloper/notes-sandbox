@@ -80,12 +80,11 @@ dom.SHELF_ENTRY = (entry) ->
       entry.title
 
 request_random_note = ->
-  # Not yet implementing SB6 on server; still using XHR for now.
-  # window.state = state
   bus.fetch_once('/notes', (obj) ->
-    console.log('hello obj is', obj, 'and loading is', loading())
+    # Hacky placeholder based on personal note folder structure.
+    candidates = obj.children.keep.children
     options = 
-      (o for _, o of obj.children.keep.children when not o.is_dir)
+      (note for _, note of candidates when not note.is_dir)
     note = options[Math.floor(Math.random() * options.length)]
     state['ls/note_data'] = parse_raw_note_md(note.content.trim())
   )
