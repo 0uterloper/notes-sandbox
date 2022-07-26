@@ -3,6 +3,21 @@ HEX_COLOR_PATTERN = /^#[0-9A-F]{6}$/i
 
 SERVER_ADDRESS = 'http://127.0.0.1:3000'
 
+DEFAULT_COLOR = '#ffffff'
+COLOR_MAP =
+  default: DEFAULT_COLOR
+  red: '#E59086'
+  orange: '#F2BE42'
+  yellow: '#FEF388'
+  green: '#D6FD9D'
+  teal: '#B9FDEC'
+  blue: '#D1EFF7'
+  darkblue: '#B3CBF6'
+  purple: '#D0B1F6'
+  pink: '#F7D1E7'
+  brown: '#E1CAAC'
+  gray: '#E8EAED'
+
 dom.BODY = -> MAIN_CONTAINER()
 
 dom.MAIN_CONTAINER = ->
@@ -38,11 +53,31 @@ dom.BUTTON_CONTAINER = ->
         onClick: request_random_note
     DIV {},
       flex: '1 1 100px'
+    COLOR_DROPDOWN()
     DIV {},
       flex: '0 0 10px'
       BUTTON {},
         id: 'pin_button'
         onClick: pin_note
+
+dom.COLOR_DROPDOWN = ->
+  DIV {},
+    LABEL {},
+      htmlFor: 'note_color'
+      'Color:'
+    select = SELECT {},
+      name: 'note_color'
+      id: 'note_color'
+      value:
+        if state['ls/note_data'].params.color?
+          state['ls/note_data'].params.color.toLowerCase()
+        else
+          'default'
+      onChange: (event) => change_note_color event.target.value
+      for color of COLOR_MAP
+        OPTION {},
+          value: color
+          color
 
 dom.NOTE_CONTAINER = ->
   DIV {},
@@ -136,30 +171,23 @@ unpin_note = (title) ->
   state['ls/shelf'] =
     (entry for entry in state['ls/shelf'] when entry.title != title)
 
+get_color_values = (color_string) ->
+  if not color_string? then DEFAULT_COLOR
+  else if HEX_COLOR_PATTERN.test(color_string) then color_string
+  else COLOR_MAP[color_string.replaceAll(' ', '').toLowerCase()]
+
+change_note_color = (new_color) ->
+  console.log(new_color)
+  state['ls/note_data'].params.color = new_color
+  state['ls/shelf'].forEach((entry) ->
+    if entry.title == state['ls/note_data'].params.title
+      entry.color = new_color
+  )
+
 init_state = ->
   bus.fetch_once 'ls/current_note_key', (obj) =>
     if not obj.note_key? then request_random_note()
   state['ls/shelf'] ?= []
-
-get_color_values = (color_string) ->
-  default_color = '#ffffff'
-  color_map =
-    red: '#E59086'
-    orange: '#F2BE42'
-    yellow: '#FEF388'
-    green: '#D6FD9D'
-    teal: '#B9FDEC'
-    blue: '#D1EFF7'
-    darkblue: '#B3CBF6'
-    purple: '#D0B1F6'
-    pink: '#F7D1E7'
-    brown: '#E1CAAC'
-    gray: '#E8EAED'
-    default: default_color
-
-  if not color_string? then default_color
-  else if HEX_COLOR_PATTERN.test(color_string) then color_string
-  else color_map[color_string.replaceAll(' ', '').toLowerCase()]
 
 init_state()
 bus(note_data)
