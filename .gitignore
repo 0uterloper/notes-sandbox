@@ -1,3 +1,5 @@
 /server/storage/markdown/*
 .DS_Store
 node_modules
+backups
+db
