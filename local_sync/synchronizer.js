@@ -1,83 +1,71 @@
 const fs = require('fs')
 const http = require('http')
 const path = require('path')
+const crypto = require('crypto')
 const bus = require('statebus').serve({file_store:false})
 bus.net_mount('/*', 'http://localhost:3006')
 
 const fs_root = '/Users/davisfoote/Documents/obsidian/Personal notes/'
 
-const save_file = (rel_path, create_parent_dirs = true) => {
-	if (rel_path === '.') {
-		// Special case at top of first recursive write.
-		bus.state['/notes'] = mkdir_if_undefined(bus.state['/notes'])
-		return
-	}
+const note_key_prefix = '/note/'
 
-	dir_obj = parse_dir_path_to_obj(path.dirname(rel_path), create_parent_dirs)
-	const filepath = path.join(fs_root, rel_path)
-	const basename = path.basename(filepath)
-	if (is_dir(filepath)) {
-		dir_obj.children[basename] = {
-			is_dir: true,
-			children: {},
-			content: null,
-		}
-			// mkdir_if_undefined(dir_obj.children[basename])
-	} else if (is_md(filepath)) {
-		// ^Slightly hacky placeholder logic for only wanting to sync .md files.
-		dir_obj.children[basename] = {
-			is_dir: false,
-			children: null,
-			content: fs.readFileSync(filepath, 'utf8'),
-		}
-	}
-}
+const save_note = (rel_path) => {
+	const abs_path = path.join(fs_root, rel_path)
 
-// Returns null if dir doesn't exist and create_parent_dirs is false.
-// Otherwise, returns the state object on server corresponding to that dir.
-const parse_dir_path_to_obj = (dir_path, create_parent_dirs = false) => {
-	var parent_obj = bus.state['/notes']
-	if (dir_path == '.') {
-		return parent_obj
-	}
+	const key = note_key_prefix + hash_filepath(rel_path)
+	const content = fs.readFileSync(abs_path, 'utf8')
 
-	dir_path.split(path.sep).forEach((child_dir) => {
-		if (create_parent_dirs) {
-			parent_obj.children[child_dir] = 
-				mkdir_if_undefined(parent_obj.children[child_dir])
-		} else if (!(child_dir in parent_obj)) {
-			return null
-		}
-		parent_obj = parent_obj.children[child_dir]
+	const note_obj = bus.fetch(key)
+	Object.assign(note_obj, {
+		content: content,
+		location: rel_path,
 	})
+	bus.save(note_obj)
 
-	return parent_obj
+	const all_notes = bus.fetch('/all_notes')
+	all_notes.list.push(key)
+	bus.save(all_notes)
 }
 
-const mkdir_if_undefined = (x) => {
-	if (typeof x === 'undefined') {
-		return {
-			is_dir: true,
-			children: {},
-			content: null,
-		}
-	} else {
-		return x
-	}
+const delete_note = (rel_path) => {
+	const delete_key = note_key_prefix + hash_filepath(rel_path)
+
+	const all_notes = bus.fetch('/all_notes')
+	all_notes.list = all_notes.list.filter(key => key !== delete_key)
+	bus.save(all_notes)
+
+	bus.delete(delete_key)
 }
 
-// This implementation is a unnecessarily quadratic. This won't matter at all
-// at current scale, but could eventually.
-const recursive_save = (rel_path) => {
-	save_file(rel_path)
+const hash_filepath = (rel_path) => {
+	// hex because base64 sometimes uses '/' and I feel like that could be a
+	// problem later.
+	return crypto.createHash('sha256').update(rel_path).digest('hex')
+}
+
+const recursive_save = (rel_path = '.') => {
 	const abs_path = path.join(fs_root, rel_path)
 	if (is_dir(abs_path)) {
 		fs.readdirSync(abs_path).forEach(basename => {
-			if (!is_private(basename)) {
+			if (!is_private(basename)) {  // Ignore private directories.
 				recursive_save(path.join(rel_path, basename))
 			}
 		})
+	} else if (is_md(abs_path)) {
+		save_note(rel_path)
 	}
+}
+
+// This fully clobbers state on the server. Currently safe, because server
+// doesn't mutate any data.
+// NOT SAFE IF THE SERVER IS MUTATING OR CREATING ANY DATA.
+// TODO: Implement an initialization that incorporates changes from server.
+const init_state = () => {
+	const all_notes = {
+		key: '/all_notes',
+		list: [],
+	}
+	bus.save(all_notes)
 }
 
 // Utils
@@ -90,39 +78,35 @@ const is_dir = (filepath) => {
 	return fs.lstatSync(filepath).isDirectory()
 }
 
-const is_private = filepath => Array.from(filepath)[0] === '.'
+const is_private = filepath => Array.from(path.basename(filepath))[0] === '.'
 
 const is_md = filepath => path.extname(filepath) === '.md'
 
 // Execution
 
 // Start with a full send over. This avoids more complicated diffing for now.
-recursive_save('.')
+init_state()
+recursive_save()
 
 // Watch source for changes and keep server synchronized with source.
-//
-// In some brief testing, the eventType arg doesn't work. Easy to handle
-// manually. Docs say filename is also unreliable. I haven't seen issues yet,
-// but I will at least add logging to catch if filename is null. If this
-// happens, I can implement some kind of full sync.
-// fs.watch(fsRoot, {recursive: true}, (eventType, filename) => {
-// 	if (Array.from(filename)[0] === '.') {
-// 		// Private file; ignore.
-// 		return
-// 	}
-// 	if (filename) {
-// 		// console.log(`Change to file ${filename}`)
-// 		const sourcePath = path.join(fsRoot, filename)
-// 		if (fs.existsSync(sourcePath)) {
-// 			// Edit was not a path deletion.
-// 			putAddition(filename)
-// 		} else {
-// 			// Edit was a path deletion.
-// 			// Note: file renames trigger two events, one for the old name and one
-// 			// for the new name. This will process the deletion of the old name.
-// 			putDeletion(filename)
-// 		}
-// 	} else {
-// 		console.error(`Change to file, but filename not known. No action taken.`)
-// 	}
-// })
+// For now, this cannot handle directories being renamed or deleted.
+// In those cases, re-running the synchronizer will fix it.
+// TODO: Implement something more graceful.
+fs.watch(fs_root, {recursive: true}, (_, rel_path) => {
+	if (rel_path) {
+		if (is_md(rel_path)) {
+			console.log(`Change to file ${rel_path}`)
+			if (fs.existsSync(path.join(fs_root, rel_path))) {
+				// Edit was not a path deletion.
+				save_note(rel_path)
+			} else {
+				// Edit was a path deletion.
+				// Note: Renames trigger two events, one each for the old name
+				// and the new name. This processes the deletion of the old one.
+				delete_note(rel_path)
+			}
+		}
+	} else {
+		console.error('Change to file, but rel_path unknown. No action taken.')
+	}
+})

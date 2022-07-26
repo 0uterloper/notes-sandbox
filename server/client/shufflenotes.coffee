@@ -76,33 +76,34 @@ dom.SHELF_ENTRY = (entry) ->
       onClick: => unpin_note entry.title
       'x'
     DIV {},
-      onClick: => request_specific_note entry.title
+      onClick: => request_specific_note entry.note_key
       entry.title
 
 request_random_note = ->
-  bus.fetch_once('/notes', (obj) ->
-    # Hacky placeholder based on personal note folder structure.
-    candidates = obj.children.keep.children
-    options = 
-      (note for _, note of candidates when not note.is_dir)
-    note = options[Math.floor(Math.random() * options.length)]
-    state['ls/note_data'] = parse_raw_note_md(note.content.trim())
+  bus.fetch_once('/all_notes', (obj) ->
+    options = obj.list
+    note_key = options[Math.floor(Math.random() * options.length)]
+    request_specific_note note_key
   )
 
-request_specific_note = (title) ->
-  make_get_request "/note=#{title}"
+request_specific_note = (note_key) ->
+  bus.save
+    key: 'ls/current_note_key'
+    note_key: note_key
 
-make_get_request = (url) ->
-  req = new XMLHttpRequest()
-  req.open('GET', SERVER_ADDRESS + url)
-  req.send()
-  req.onloadend = =>
-    note_data = parse_raw_note_md(req.responseText.trim())
-    state['ls/note_data'] = note_data
+# Whenever current_note_key changes, update note_data
+note_data = ->
+  current_note_key = bus.fetch('ls/current_note_key').note_key
+  note = bus.fetch current_note_key
+  note_data = parse_raw_note_md(note.content.trim())
+  note_data.params.title ?= note.location
+  note_data.key = 'ls/note_data'
+  bus.save note_data
 
 parse_raw_note_md = (raw_md) =>
   has_frontmatter = FRONTMATTER_PATTERN.test(raw_md)
   content = raw_md
+  parsed_params = {}
 
   if has_frontmatter
     content_index = raw_md.indexOf('\n---')
@@ -121,22 +122,23 @@ parse_params = (params_strings) ->
   (result[k] = v) for [k, v] in params_pairs
   result
 
-# This will not work for a note with no title.
-# TODO: Catch no-title case or enforce invariant.
 pin_note = ->
-  title = state['ls/note_data'].params.title
-  color = state['ls/note_data'].params.color
-  if not state['ls/shelf'].some((entry) -> entry.title == title)
-    state['ls/shelf'].push
-      title: title
-      color: color
+  new_entry = {
+    title: state['ls/note_data'].params.title
+    color: state['ls/note_data'].params.color
+  }
+  bus.fetch_once 'ls/current_note_key', (obj) =>
+    new_entry.note_key = obj.note_key
+  if not state['ls/shelf'].some((entry) -> entry.title == new_entry.title)
+    state['ls/shelf'].push new_entry
 
 unpin_note = (title) ->
   state['ls/shelf'] =
     (entry for entry in state['ls/shelf'] when entry.title != title)
 
 init_state = ->
-  if not state['ls/note_data']? then request_random_note()
+  bus.fetch_once 'ls/current_note_key', (obj) =>
+    if not obj.note_key? then request_random_note()
   state['ls/shelf'] ?= []
 
 get_color_values = (color_string) ->
@@ -160,3 +162,4 @@ get_color_values = (color_string) ->
   else color_map[color_string.replaceAll(' ', '').toLowerCase()]
 
 init_state()
+bus(note_data)
