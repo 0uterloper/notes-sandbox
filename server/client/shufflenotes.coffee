@@ -99,7 +99,6 @@ note_data = ->
   note_data.params.title ?= note.location
   note_data.key = 'ls/note_data'
   bus.save note_data
-bus(note_data)
 
 parse_raw_note_md = (raw_md) =>
   has_frontmatter = FRONTMATTER_PATTERN.test(raw_md)
@@ -163,3 +162,4 @@ get_color_values = (color_string) ->
   else color_map[color_string.replaceAll(' ', '').toLowerCase()]
 
 init_state()
+bus(note_data)
