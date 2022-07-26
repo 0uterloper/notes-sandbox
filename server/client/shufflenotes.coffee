@@ -142,20 +142,13 @@ parse_raw_note_md = (raw_md) =>
 
   if has_frontmatter
     content_index = raw_md.indexOf('\n---')
-    frontmatter = raw_md.slice(4, content_index)
-    parsed_params = parse_params(frontmatter.split('\n'))
-    content = raw_md.slice(content_index + 6)
+    parsed_params = jsyaml.load(raw_md.slice('---\n'.length, content_index))
+    content = raw_md.slice(content_index + '\n---\n\n'.length)
 
   {
     params: parsed_params
     content: content
   }
-
-parse_params = (params_strings) ->
-  params_pairs = (line.split(': ') for line in params_strings)
-  result = {}
-  (result[k] = v) for [k, v] in params_pairs
-  result
 
 pin_note = ->
   new_entry = {
@@ -177,7 +170,6 @@ get_color_values = (color_string) ->
   else COLOR_MAP[color_string.replaceAll(' ', '').toLowerCase()]
 
 change_note_color = (new_color) ->
-  console.log(new_color)
   state['ls/note_data'].params.color = new_color
   state['ls/shelf'].forEach((entry) ->
     if entry.title == state['ls/note_data'].params.title
