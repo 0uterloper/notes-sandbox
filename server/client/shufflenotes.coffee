@@ -136,19 +136,33 @@ note_data = ->
   bus.save note_data
 
 parse_raw_note_md = (raw_md) =>
-  has_frontmatter = FRONTMATTER_PATTERN.test(raw_md)
-  content = raw_md
-  parsed_params = {}
-
-  if has_frontmatter
-    content_index = raw_md.indexOf('\n---')
-    parsed_params = jsyaml.load(raw_md.slice('---\n'.length, content_index))
-    content = raw_md.slice(content_index + '\n---\n\n'.length)
-
+  [params, content] = unpack_yaml_headers raw_md
   {
-    params: parsed_params
+    params: params
     content: content
   }
+
+unpack_yaml_headers = (raw_md) ->
+  has_frontmatter = FRONTMATTER_PATTERN.test(raw_md)
+  if has_frontmatter
+    content_index = raw_md.indexOf('\n---')
+    [jsyaml.load(raw_md.slice('---\n'.length, content_index)),
+     raw_md.slice(content_index + '\n---\n\n'.length)]
+  else
+    [{}, raw_md]
+
+repack_yaml_headers = (params, content) ->
+  frontmatter = jsyaml.dump params
+  '---\n' + frontmatter + '\n---\n\n' + content
+
+edit_yaml_headers_of_current_note = (key, val) ->
+  current_note_key = bus.fetch('ls/current_note_key').note_key
+  bus.fetch_once(current_note_key, (note_obj) ->
+    [params, content] = unpack_yaml_headers note_obj.content
+    params[key] = val
+    note_obj.content = repack_yaml_headers params, content
+    bus.save note_obj
+  )
 
 pin_note = ->
   new_entry = {
@@ -170,7 +184,7 @@ get_color_values = (color_string) ->
   else COLOR_MAP[color_string.replaceAll(' ', '').toLowerCase()]
 
 change_note_color = (new_color) ->
-  state['ls/note_data'].params.color = new_color
+  edit_yaml_headers_of_current_note('color', new_color)
   state['ls/shelf'].forEach((entry) ->
     if entry.title == state['ls/note_data'].params.title
       entry.color = new_color
