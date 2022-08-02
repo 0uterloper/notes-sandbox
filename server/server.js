@@ -10,8 +10,9 @@ bus.fetch('all_notes', (all_notes) => {
 
 bus('note/*').to_save = (note_obj) => {
 	const all_notes = bus.fetch('all_notes')
-	if (!all_notes.list.includes(note_obj.key)) {
-		all_notes.list.push('/' + note_obj.key)
+	key = '/' + note_obj.key
+	if (!all_notes.list.includes(key)) {
+		all_notes.list.push(key)
 	}
 	bus.save(all_notes)
 	bus.save.fire(note_obj)
