@@ -30,9 +30,9 @@ dom.MAIN_CONTAINER = ->
 dom.SIDE_PANEL = ->
   DIV {},
     id: 'side_panel'
-    for entry in state['ls/shelf'] ? []
+    for note_key in state['ls/shelf'] ? []
       SHELF_ENTRY
-        entry: entry
+        note_key: note_key
 
 dom.SHUFFLE_AREA = ->
   DIV {},
@@ -58,7 +58,7 @@ dom.BUTTON_CONTAINER = ->
       flex: '0 0 10px'
       BUTTON {},
         id: 'pin_button'
-        onClick: pin_note
+        onClick: pin_current_note
 
 dom.COLOR_DROPDOWN = ->
   DIV {},
@@ -73,7 +73,7 @@ dom.COLOR_DROPDOWN = ->
           state['ls/note_data'].params.color.toLowerCase()
         else
           'default'
-      onChange: (event) => change_note_color event.target.value
+      onChange: (event) => change_current_note_color event.target.value
       for color of COLOR_MAP
         OPTION {},
           value: color
@@ -102,17 +102,18 @@ dom.TAGS_CONTAINER = ->
         if state['ls/note_data']?
           LI "#{k}: #{v}" for k, v of JSON.parse state['ls/note_data'].params
 
-dom.SHELF_ENTRY = (entry) ->
+dom.SHELF_ENTRY = (note_key) ->
+  entry = bus.fetch(note_key)
   DIV {},
     display: 'flex'
-    backgroundColor: get_color_values entry.color
+    backgroundColor: get_color_values read_header(entry.content, 'color')
     BUTTON {},
       color: 'red'
-      onClick: => unpin_note entry.title
+      onClick: => unpin_note note_key
       'x'
     DIV {},
-      onClick: => request_specific_note entry.note_key
-      entry.title
+      onClick: => request_specific_note entry.key
+      read_header(entry.content, 'title') ? entry.location
 
 request_random_note = ->
   bus.fetch_once('/all_notes', (obj) ->
@@ -164,31 +165,26 @@ edit_yaml_headers_of_current_note = (key, val) ->
     bus.save note_obj
   )
 
-pin_note = ->
-  new_entry = {
-    title: state['ls/note_data'].params.title
-    color: state['ls/note_data'].params.color
-  }
-  bus.fetch_once 'ls/current_note_key', (obj) =>
-    new_entry.note_key = obj.note_key
-  if not state['ls/shelf'].some((entry) -> entry.title == new_entry.title)
-    state['ls/shelf'].push new_entry
+read_header = (raw_md, key) ->
+  [params, _] = unpack_yaml_headers raw_md
+  params[key]
 
-unpin_note = (title) ->
-  state['ls/shelf'] =
-    (entry for entry in state['ls/shelf'] when entry.title != title)
+pin_current_note = -> pin_note bus.fetch('ls/current_note_key').note_key
+
+pin_note = (note_key) ->
+  if not state['ls/shelf'].some((nk) -> nk == note_key)
+    state['ls/shelf'].push note_key
+
+unpin_note = (note_key) ->
+  state['ls/shelf'] = (nk for nk in state['ls/shelf'] when nk != note_key)
 
 get_color_values = (color_string) ->
   if not color_string? then DEFAULT_COLOR
   else if HEX_COLOR_PATTERN.test(color_string) then color_string
   else COLOR_MAP[color_string.replaceAll(' ', '').toLowerCase()]
 
-change_note_color = (new_color) ->
+change_current_note_color = (new_color) ->
   edit_yaml_headers_of_current_note('color', new_color)
-  state['ls/shelf'].forEach((entry) ->
-    if entry.title == state['ls/note_data'].params.title
-      entry.color = new_color
-  )
 
 init_state = ->
   bus.fetch_once 'ls/current_note_key', (obj) =>
