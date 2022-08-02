@@ -1,5 +1,4 @@
 const fs = require('fs')
-const http = require('http')
 const path = require('path')
 const crypto = require('crypto')
 const bus = require('statebus').serve({file_store:false})
@@ -11,30 +10,18 @@ const note_key_prefix = '/note/'
 
 const save_note = (rel_path) => {
 	const abs_path = path.join(fs_root, rel_path)
-
-	const key = note_key_prefix + hash_filepath(rel_path)
 	const content = fs.readFileSync(abs_path, 'utf8')
 
-	const note_obj = bus.fetch(key)
+	const note_obj = bus.fetch(note_key_prefix + hash_filepath(rel_path))
 	Object.assign(note_obj, {
 		content: content,
 		location: rel_path,
 	})
 	bus.save(note_obj)
-
-	const all_notes = bus.fetch('/all_notes')
-	all_notes.list.push(key)
-	bus.save(all_notes)
 }
 
 const delete_note = (rel_path) => {
-	const delete_key = note_key_prefix + hash_filepath(rel_path)
-
-	const all_notes = bus.fetch('/all_notes')
-	all_notes.list = all_notes.list.filter(key => key !== delete_key)
-	bus.save(all_notes)
-
-	bus.delete(delete_key)
+	bus.delete(note_key_prefix + hash_filepath(rel_path))
 }
 
 const hash_filepath = (rel_path) => {
@@ -56,18 +43,6 @@ const recursive_save = (rel_path = '.') => {
 	}
 }
 
-// This fully clobbers state on the server. Currently safe, because server
-// doesn't mutate any data.
-// NOT SAFE IF THE SERVER IS MUTATING OR CREATING ANY DATA.
-// TODO: Implement an initialization that incorporates changes from server.
-const init_state = () => {
-	const all_notes = {
-		key: '/all_notes',
-		list: [],
-	}
-	bus.save(all_notes)
-}
-
 // Utils
 
 const is_dir = (filepath) => {
@@ -85,7 +60,6 @@ const is_md = filepath => path.extname(filepath) === '.md'
 // Execution
 
 // Start with a full send over. This avoids more complicated diffing for now.
-init_state()
 recursive_save()
 
 // Watch source for changes and keep server synchronized with source.
@@ -95,14 +69,15 @@ recursive_save()
 fs.watch(fs_root, {recursive: true}, (_, rel_path) => {
 	if (rel_path) {
 		if (is_md(rel_path)) {
-			console.log(`Change to file ${rel_path}`)
 			if (fs.existsSync(path.join(fs_root, rel_path))) {
 				// Edit was not a path deletion.
+				console.log(`Edit to file ${rel_path}`)
 				save_note(rel_path)
 			} else {
 				// Edit was a path deletion.
 				// Note: Renames trigger two events, one each for the old name
 				// and the new name. This processes the deletion of the old one.
+				console.log(`Deleted file ${rel_path}`)
 				delete_note(rel_path)
 			}
 		}
