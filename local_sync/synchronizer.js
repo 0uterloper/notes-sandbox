@@ -4,6 +4,8 @@ const crypto = require('crypto')
 const bus = require('statebus').serve({file_store:false})
 bus.net_mount('/*', 'http://localhost:3006')
 
+const WRITE_TO_FS = true
+
 const fs_root = '/Users/davisfoote/Documents/obsidian/Personal notes/'
 
 const note_key_prefix = '/note/'
@@ -85,3 +87,23 @@ fs.watch(fs_root, {recursive: true}, (_, rel_path) => {
 		console.error('Change to file, but rel_path unknown. No action taken.')
 	}
 })
+
+write_back_changes = () => {
+	bus.fetch('/all_notes', (all_notes) => {
+		all_notes.list.forEach((note_key) => {
+			bus.fetch(note_key, (note_obj) => {
+				const abs_path = path.join(fs_root, note_obj.location)
+				const server_version = note_obj.content
+
+				if (WRITE_TO_FS) {
+					fs.writeFileSync(abs_path, server_version)
+				} else {
+					console.log('local :', fs.readFileSync(abs_path, 'utf-8'))
+					console.log('server:', server_version)
+				}
+			})
+		})
+	})
+}
+
+bus(write_back_changes)
