@@ -1,4 +1,4 @@
-FRONTMATTER_PATTERN = /^---\n(?:.*\n)*---\n\n/
+FRONTMATTER_PATTERN = /^---\n(?:.*\n)*---\n/
 HEX_COLOR_PATTERN = /^#[0-9A-F]{6}$/i
 
 SERVER_ADDRESS = 'http://127.0.0.1:3000'
@@ -147,7 +147,7 @@ unpack_yaml_headers = (raw_md) ->
   if has_frontmatter
     content_index = raw_md.indexOf('\n---')
     [jsyaml.load(raw_md.slice('---\n'.length, content_index)),
-     raw_md.slice(content_index + '\n---\n\n'.length)]
+     raw_md.slice(content_index + '\n---'.length).trimStart()]
   else
     [{}, raw_md]
 
