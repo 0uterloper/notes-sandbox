@@ -68,11 +68,7 @@ dom.COLOR_DROPDOWN = ->
     select = SELECT {},
       name: 'note_color'
       id: 'note_color'
-      value:
-        if state['ls/note_data'].params.color?
-          state['ls/note_data'].params.color.toLowerCase()
-        else
-          'default'
+      value: current_note_color()
       onChange: (event) => change_current_note_color event.target.value
       for color of COLOR_MAP
         OPTION {},
@@ -82,15 +78,14 @@ dom.COLOR_DROPDOWN = ->
 dom.NOTE_CONTAINER = ->
   DIV {},
     id: 'note_container'
-    backgroundColor: if state['ls/note_data']? 
-      get_color_values state['ls/note_data'].params.color
+    backgroundColor: get_color_values current_note_color()
     DIV {},
       id: 'note_title'
-      if state['ls/note_data']? then state['ls/note_data'].params.title ? ''
+      current_note_title()
     BR()
     DIV {},
       id: 'note_text'
-      if state['ls/note_data']? then state['ls/note_data'].content
+      current_note_text()
 
 dom.TAGS_CONTAINER = ->
   DIV {},
@@ -99,8 +94,7 @@ dom.TAGS_CONTAINER = ->
       id: 'tags_text'
       'Tags:'
       UL {},
-        if state['ls/note_data']?
-          LI "#{k}: #{v}" for k, v of JSON.parse state['ls/note_data'].params
+        LI "#{k}: #{v}" for k, v of current_note_headers()
 
 dom.SHELF_ENTRY = (note_key) ->
   entry = bus.fetch(note_key)
@@ -127,49 +121,39 @@ request_specific_note = (note_key) ->
     key: 'ls/current_note_key'
     note_key: note_key
 
-# Whenever current_note_key changes, update note_data
-note_data = ->
-  current_note_key = bus.fetch('ls/current_note_key').note_key
-  note = bus.fetch current_note_key
-  note_data = parse_raw_note_md(note.content.trim())
-  note_data.params.title ?= note.location
-  note_data.key = 'ls/note_data'
-  bus.save note_data
-
-parse_raw_note_md = (raw_md) =>
-  [params, content] = unpack_yaml_headers raw_md
-  {
-    params: params
-    content: content
-  }
+current_note_key = -> bus.fetch('ls/current_note_key').note_key
+current_note = -> bus.fetch current_note_key()
+current_note_text = -> unpack_yaml_headers(current_note().content).content
+current_note_headers = -> unpack_yaml_headers(current_note().content).params
+current_note_color = -> read_header(current_note().content, 'color') ? 'default'
+current_note_title = ->
+  note = current_note()
+  read_header(note.content, 'title') ? note.location
 
 unpack_yaml_headers = (raw_md) ->
   has_frontmatter = FRONTMATTER_PATTERN.test(raw_md)
   if has_frontmatter
     content_index = raw_md.indexOf('\n---')
-    [jsyaml.load(raw_md.slice('---\n'.length, content_index)),
-     raw_md.slice(content_index + '\n---'.length).trimStart()]
+    {params: jsyaml.load(raw_md.slice('---\n'.length, content_index)),
+     content: raw_md.slice(content_index + '\n---'.length).trimStart()}
   else
-    [{}, raw_md]
+    {params: {}, content: raw_md}
 
 repack_yaml_headers = (params, content) ->
   frontmatter = jsyaml.dump params
   '---\n' + frontmatter + '\n---\n\n' + content
 
-edit_yaml_headers_of_current_note = (key, val) ->
-  current_note_key = bus.fetch('ls/current_note_key').note_key
-  bus.fetch_once(current_note_key, (note_obj) ->
-    [params, content] = unpack_yaml_headers note_obj.content
-    params[key] = val
-    note_obj.content = repack_yaml_headers params, content
-    bus.save note_obj
-  )
+edit_yaml_header_of_current_note = (key, val) ->
+  note_obj = current_note()
+  {params, content} = unpack_yaml_headers note_obj.content
+  params[key] = val
+  note_obj.content = repack_yaml_headers params, content
+  bus.save note_obj
 
 read_header = (raw_md, key) ->
-  [params, _] = unpack_yaml_headers raw_md
-  params[key]
+  unpack_yaml_headers(raw_md).params[key]
 
-pin_current_note = -> pin_note bus.fetch('ls/current_note_key').note_key
+pin_current_note = -> pin_note current_note_key()
 
 pin_note = (note_key) ->
   if not state['ls/shelf'].some((nk) -> nk == note_key)
@@ -184,12 +168,10 @@ get_color_values = (color_string) ->
   else COLOR_MAP[color_string.replaceAll(' ', '').toLowerCase()]
 
 change_current_note_color = (new_color) ->
-  edit_yaml_headers_of_current_note('color', new_color)
+  edit_yaml_header_of_current_note('color', new_color)
 
 init_state = ->
-  bus.fetch_once 'ls/current_note_key', (obj) =>
-    if not obj.note_key? then request_random_note()
+  if not current_note_key()? then request_random_note()
   state['ls/shelf'] ?= []
 
 init_state()
-bus(note_data)
