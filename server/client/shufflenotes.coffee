@@ -3,6 +3,8 @@ HEX_COLOR_PATTERN = /^#[0-9A-F]{6}$/i
 
 SERVER_ADDRESS = 'http://127.0.0.1:3000'
 
+OBSIDIAN_VAULT_NAME = 'Personal notes'
+
 DEFAULT_COLOR = '#ffffff'
 COLOR_MAP =
   default: DEFAULT_COLOR
@@ -81,7 +83,11 @@ dom.NOTE_CONTAINER = ->
     backgroundColor: get_color_values note_color()
     DIV {},
       id: 'note_title'
-      note_title()
+      A {},
+        textDecoration: 'none'
+        href: encode_obsidian_link current_note_key()
+        '🖊'
+      ' ' + note_title()
     BR()
     DIV {},
       id: 'note_text'
@@ -170,6 +176,11 @@ get_color_values = (color_string) ->
 
 change_current_note_color = (new_color) ->
   edit_yaml_header_of_current_note('color', new_color)
+
+encode_obsidian_link = (note_key) ->
+  vault = encodeURIComponent(OBSIDIAN_VAULT_NAME)
+  file = encodeURIComponent(bus.fetch(note_key).location)
+  "obsidian://open?vault=#{vault}&file=#{file}"
 
 init_state = ->
   if not current_note_key()? then request_random_note()
