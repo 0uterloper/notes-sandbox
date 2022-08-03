@@ -68,7 +68,7 @@ dom.COLOR_DROPDOWN = ->
     select = SELECT {},
       name: 'note_color'
       id: 'note_color'
-      value: current_note_color()
+      value: note_color()
       onChange: (event) => change_current_note_color event.target.value
       for color of COLOR_MAP
         OPTION {},
@@ -78,10 +78,10 @@ dom.COLOR_DROPDOWN = ->
 dom.NOTE_CONTAINER = ->
   DIV {},
     id: 'note_container'
-    backgroundColor: get_color_values current_note_color()
+    backgroundColor: get_color_values note_color()
     DIV {},
       id: 'note_title'
-      current_note_title()
+      note_title()
     BR()
     DIV {},
       id: 'note_text'
@@ -97,17 +97,16 @@ dom.TAGS_CONTAINER = ->
         LI "#{k}: #{v}" for k, v of current_note_headers()
 
 dom.SHELF_ENTRY = (note_key) ->
-  entry = bus.fetch(note_key)
   DIV {},
     display: 'flex'
-    backgroundColor: get_color_values read_header(entry.content, 'color')
+    backgroundColor: get_color_values note_color note_key
     BUTTON {},
       color: 'red'
       onClick: => unpin_note note_key
       'x'
     DIV {},
-      onClick: => request_specific_note entry.key
-      read_header(entry.content, 'title') ? entry.location
+      onClick: => request_specific_note note_key
+      note_title note_key
 
 request_random_note = ->
   bus.fetch_once('/all_notes', (obj) ->
@@ -125,9 +124,11 @@ current_note_key = -> bus.fetch('ls/current_note_key').note_key
 current_note = -> bus.fetch current_note_key()
 current_note_text = -> unpack_yaml_headers(current_note().content).content
 current_note_headers = -> unpack_yaml_headers(current_note().content).params
-current_note_color = -> read_header(current_note().content, 'color') ? 'default'
-current_note_title = ->
-  note = current_note()
+note_color = (note_key=null) ->
+  note = if note_key? then bus.fetch(note_key) else current_note()
+  read_header(note.content, 'color') ? 'default'
+note_title = (note_key=null) ->
+  note = if note_key? then bus.fetch(note_key) else current_note()
   read_header(note.content, 'title') ? note.location
 
 unpack_yaml_headers = (raw_md) ->
