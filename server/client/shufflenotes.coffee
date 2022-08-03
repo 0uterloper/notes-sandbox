@@ -142,7 +142,7 @@ unpack_yaml_headers = (raw_md) ->
 
 repack_yaml_headers = (params, content) ->
   frontmatter = jsyaml.dump params
-  '---\n' + frontmatter + '\n---\n\n' + content
+  '---\n' + frontmatter + '---\n\n' + content
 
 edit_yaml_header_of_current_note = (key, val) ->
   note_obj = current_note()
