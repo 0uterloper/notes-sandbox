@@ -1,6 +1,5 @@
 const fs = require('fs')
 const path = require('path')
-const crypto = require('crypto')
 const bus = require('statebus').serve({file_store:false})
 bus.net_mount('/*', 'http://localhost:3006')
 
@@ -14,8 +13,8 @@ const save_note = (rel_path, msg_on_save=null) => {
 	const abs_path = path.join(fs_root, rel_path)
 	const content = fs.readFileSync(abs_path, 'utf8')
 
-	const note_obj = bus.fetch(note_key_prefix + hash_filepath(rel_path))
-	bus.fetch_once(note_key_prefix + hash_filepath(rel_path), (note_obj) => {
+	const note_obj = bus.fetch(note_key_prefix + rel_path)
+	bus.fetch_once(note_key_prefix + rel_path, (note_obj) => {
 		if (content !== note_obj.content) {
 			Object.assign(note_obj, {
 				content: content,
@@ -31,13 +30,7 @@ const save_note = (rel_path, msg_on_save=null) => {
 }
 
 const delete_note = (rel_path) => {
-	bus.delete(note_key_prefix + hash_filepath(rel_path))
-}
-
-const hash_filepath = (rel_path) => {
-	// hex because base64 sometimes uses '/' and I feel like that could be a
-	// problem later.
-	return crypto.createHash('sha256').update(rel_path).digest('hex')
+	bus.delete(note_key_prefix + rel_path)
 }
 
 const recursive_save = (rel_path = '.') => {
