@@ -126,6 +126,15 @@ request_specific_note = (note_key) ->
     key: 'ls/current_note_key'
     note_key: note_key
 
+map_over_notes = (fn) ->
+  bus.fetch_once '/all_notes', (all_notes) ->
+    all_notes.list.forEach (note_key) ->
+      bus.fetch_once note_key, (note) ->
+        result = fn(note.content)
+        if result?
+          note.content = result
+          bus.save note
+
 current_note_key = -> bus.fetch('ls/current_note_key').note_key
 current_note = -> bus.fetch current_note_key()
 current_note_text = -> unpack_yaml_headers(current_note().content).content
@@ -135,7 +144,7 @@ note_color = (note_key=null) ->
   read_header(note.content, 'color') ? 'default'
 note_title = (note_key=null) ->
   note = if note_key? then bus.fetch(note_key) else current_note()
-  read_header(note.content, 'title') ? note.location
+  note.location
 
 unpack_yaml_headers = (raw_md) ->
   has_frontmatter = FRONTMATTER_PATTERN.test(raw_md)
@@ -147,8 +156,11 @@ unpack_yaml_headers = (raw_md) ->
     {params: {}, content: raw_md}
 
 repack_yaml_headers = (params, content) ->
-  frontmatter = jsyaml.dump params
-  '---\n' + frontmatter + '---\n\n' + content
+  if Object.keys(params).length == 0
+    content
+  else
+    frontmatter = jsyaml.dump params
+    '---\n' + frontmatter + '---\n\n' + content
 
 edit_yaml_header_of_current_note = (key, val) ->
   note_obj = current_note()
@@ -172,7 +184,7 @@ unpin_note = (note_key) ->
 get_color_values = (color_string) ->
   if not color_string? then DEFAULT_COLOR
   else if HEX_COLOR_PATTERN.test(color_string) then color_string
-  else COLOR_MAP[color_string.replaceAll(' ', '').toLowerCase()]
+  else COLOR_MAP[color_string]
 
 change_current_note_color = (new_color) ->
   edit_yaml_header_of_current_note('color', new_color)
