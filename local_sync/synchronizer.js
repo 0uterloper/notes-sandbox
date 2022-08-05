@@ -53,47 +53,54 @@ const recursive_save = (rel_path = '.') => {
 	}
 }
 
-// Utils
-
-const is_dir = (filepath) => {
-	if (!fs.existsSync(filepath)) {
-		console.log(`Checked if dir for ${filepath} which does not exist.`)
-		return false;
+const register_deletions = () => {
+	const to_delete = []
+	bus.fetch('/all_notes').list.forEach((note_key) => {
+		const rel_path = bus.fetch(note_key).location
+		const abs_path = path.join(fs_root, rel_path)
+		if (!fs.existsSync(abs_path)) {
+			console.log(
+				`Deleting ${rel_path} on server, which does not exist locally.`)
+			to_delete.push(rel_path)
+		}
+	})
+	if (!bus.loading()) {
+		to_delete.forEach(delete_note)
 	}
-	return fs.lstatSync(filepath).isDirectory()
 }
 
-const is_private = filepath => Array.from(path.basename(filepath))[0] === '.'
-
-const is_md = filepath => path.extname(filepath) === '.md'
-
-// Execution
-
-// Start with a full send over. This avoids more complicated diffing for now.
-recursive_save()
+const check_deletions = () => {
+	return bus.fetch('/all_notes').list.every((note_key) => {
+		return fs.existsSync(path.join(fs_root, bus.fetch(note_key).location))
+	})
+}
 
 // Watch source for changes and keep server synchronized with source.
 // For now, this cannot handle directories being renamed or deleted.
 // In those cases, re-running the synchronizer will fix it.
 // TODO: Implement something more graceful.
-fs.watch(fs_root, {recursive: true}, (_, rel_path) => {
-	if (rel_path) {
-		if (is_md(rel_path)) {
-			if (fs.existsSync(path.join(fs_root, rel_path))) {
-				// Edit was not a path deletion.
-				save_note(rel_path, `Local edit to file ${rel_path}`)
-			} else {
-				// Edit was a path deletion.
-				// Note: Renames trigger two events, one each for the old name
-				// and the new name. This processes the deletion of the old one.
-				console.log(`Local deleted file ${rel_path}`)
-				delete_note(rel_path)
+const watch_local_files = () => {
+	fs.watch(fs_root, {recursive: true}, (_, rel_path) => {
+		if (rel_path) {
+			if (is_md(rel_path)) {
+				if (fs.existsSync(path.join(fs_root, rel_path))) {
+					// Edit was not a path deletion.
+					save_note(rel_path, `Local edit to file ${rel_path}`)
+				} else {
+					// Edit was a path deletion.
+					// Note: Renames trigger two events, one each for the old
+					// name and the new name. This processes the deletion of the
+					// old one.
+					console.log(`Local deleted file ${rel_path}`)
+					delete_note(rel_path)
+				}
 			}
+		} else {
+			console.error(
+				'Change to file, but rel_path unknown. No action taken.')
 		}
-	} else {
-		console.error('Change to file, but rel_path unknown. No action taken.')
-	}
-})
+	})
+}
 
 write_back_changes = () => {
 	bus.fetch('/all_notes', (all_notes) => {
@@ -117,4 +124,23 @@ write_back_changes = () => {
 	})
 }
 
-bus(write_back_changes)
+// Utils
+
+const is_private = filepath => Array.from(path.basename(filepath))[0] === '.'
+const is_md = filepath => path.extname(filepath) === '.md'
+const is_dir = (filepath) => {
+	return fs.existsSync(filepath) && fs.lstatSync(filepath).isDirectory()
+}
+
+// Execution
+
+recursive_save()
+bus.once(register_deletions)
+bus(() => {
+	if (check_deletions()) {
+		watch_local_files()
+		bus(write_back_changes)
+		bus.forget()
+	}
+})
+
