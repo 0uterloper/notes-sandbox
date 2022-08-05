@@ -10,16 +10,24 @@ const fs_root = '/Users/davisfoote/Documents/obsidian/Personal notes/'
 
 const note_key_prefix = '/note/'
 
-const save_note = (rel_path) => {
+const save_note = (rel_path, msg_on_save=null) => {
 	const abs_path = path.join(fs_root, rel_path)
 	const content = fs.readFileSync(abs_path, 'utf8')
 
 	const note_obj = bus.fetch(note_key_prefix + hash_filepath(rel_path))
-	Object.assign(note_obj, {
-		content: content,
-		location: rel_path,
+	bus.fetch_once(note_key_prefix + hash_filepath(rel_path), (note_obj) => {
+		if (content !== note_obj.content) {
+			Object.assign(note_obj, {
+				content: content,
+				location: rel_path,
+			})
+			bus.save(note_obj)
+
+			if (msg_on_save !== null) {
+				console.log(msg_on_save)
+			}
+		}
 	})
-	bus.save(note_obj)
 }
 
 const delete_note = (rel_path) => {
@@ -73,13 +81,12 @@ fs.watch(fs_root, {recursive: true}, (_, rel_path) => {
 		if (is_md(rel_path)) {
 			if (fs.existsSync(path.join(fs_root, rel_path))) {
 				// Edit was not a path deletion.
-				console.log(`Edit to file ${rel_path}`)
-				save_note(rel_path)
+				save_note(rel_path, `Local edit to file ${rel_path}`)
 			} else {
 				// Edit was a path deletion.
 				// Note: Renames trigger two events, one each for the old name
 				// and the new name. This processes the deletion of the old one.
-				console.log(`Deleted file ${rel_path}`)
+				console.log(`Local deleted file ${rel_path}`)
 				delete_note(rel_path)
 			}
 		}
@@ -93,13 +100,17 @@ write_back_changes = () => {
 		all_notes.list.forEach((note_key) => {
 			bus.fetch(note_key, (note_obj) => {
 				const abs_path = path.join(fs_root, note_obj.location)
+				const local_version = fs.readFileSync(abs_path, 'utf-8')
 				const server_version = note_obj.content
 
-				if (WRITE_TO_FS) {
-					fs.writeFileSync(abs_path, server_version)
-				} else {
-					console.log('local :', fs.readFileSync(abs_path, 'utf-8'))
-					console.log('server:', server_version)
+				if (local_version !== server_version) {
+					console.log(`Server edit to file ${note_obj.location}`)
+					if (WRITE_TO_FS) {
+						fs.writeFileSync(abs_path, server_version)
+					} else {
+						console.log('local :', local_version)
+						console.log('server:', server_version)
+					}
 				}
 			})
 		})
