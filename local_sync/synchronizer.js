@@ -98,18 +98,32 @@ const watch_local_files = () => {
 write_back_changes = () => {
 	bus.fetch('/all_notes').list.forEach((note_key) => {
 		note_obj = bus.fetch(note_key)
+		if (typeof(note_obj.location) === 'undefined') {
+			// Can't write a change without a location to write.
+			// In practice, this occurs during race conditions from batch
+			// deletions executed locally.
+			return
+		}
 		const abs_path = path.join(fs_root, note_obj.location)
-		const local_version = fs.readFileSync(abs_path, 'utf-8')
-		const server_version = note_obj.content
+		if (fs.existsSync(abs_path)) {
+			const local_version = fs.readFileSync(abs_path, 'utf-8')
+			const server_version = note_obj.content
 
-		if (local_version !== server_version) {
-			console.log(`Server edit to file ${note_obj.location}`)
-			if (WRITE_TO_FS) {
-				fs.writeFileSync(abs_path, server_version)
-			} else {
-				console.log('local :', local_version)
-				console.log('server:', server_version)
+			if (local_version !== server_version) {
+				console.log(`Server edit to file ${note_obj.location}`)
+				if (WRITE_TO_FS) {
+					fs.writeFileSync(abs_path, server_version)
+				} else {
+					console.log('local :', local_version)
+					console.log('server:', server_version)
+				}
 			}
+		}
+		else {
+			// For now, server doesn't create new files, so this only happens on
+			// local batch delete/rename. If server creates files in the future,
+			// have to somehow disambiguate here.
+			return
 		}
 	})
 }

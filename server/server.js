@@ -19,9 +19,10 @@ bus('note/*').to_save = (note_obj) => {
 	})
 }
 
-bus('note/*').to_delete = (delete_key) => {
+bus('note/*').to_delete = (delete_key, t) => {
 	bus.fetch_once('all_notes', (all_notes) => {
 		all_notes.list = all_notes.list.filter(key => key !== '/' + delete_key)
 		bus.save(all_notes)
 	})
+	t.done()
 }
