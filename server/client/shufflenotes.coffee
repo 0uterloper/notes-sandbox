@@ -144,7 +144,7 @@ note_color = (note_key=null) ->
   read_header(note.content, 'color') ? 'default'
 note_title = (note_key=null) ->
   note = if note_key? then bus.fetch(note_key) else current_note()
-  note.location
+  note.location.slice(0, -'.md'.length)  # Remove extension.
 
 unpack_yaml_headers = (raw_md) ->
   has_frontmatter = FRONTMATTER_PATTERN.test(raw_md)
