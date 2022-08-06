@@ -2,6 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const bus = require('statebus').serve({file_store:false})
 bus.net_mount('/*', 'http://localhost:3006')
+bus.honk = false
 
 const WRITE_TO_FS = true
 
