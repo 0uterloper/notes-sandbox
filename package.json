@@ -1,5 +1,6 @@
 {
   "devDependencies": {
+    "chokidar": "^3.5.3",
     "coffeescript": "^2.7.0",
     "statebus": "^6.1.25"
   }

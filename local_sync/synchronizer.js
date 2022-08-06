@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const chokidar = require('chokidar')
 const bus = require('statebus').serve({file_store:false})
 bus.net_mount('/*', 'http://localhost:3006')
 bus.honk = false
@@ -34,19 +35,6 @@ const delete_note = (rel_path) => {
 	bus.delete(note_key_prefix + rel_path)
 }
 
-const recursive_save = (rel_path = '.') => {
-	const abs_path = path.join(fs_root, rel_path)
-	if (is_dir(abs_path)) {
-		fs.readdirSync(abs_path).forEach(basename => {
-			if (!is_private(basename)) {  // Ignore private directories.
-				recursive_save(path.join(rel_path, basename))
-			}
-		})
-	} else if (is_md(abs_path)) {
-		save_note(rel_path)
-	}
-}
-
 const register_deletions = () => {
 	const to_delete = []
 	bus.fetch('/all_notes').list.forEach((note_key) => {
@@ -69,32 +57,17 @@ const check_deletions = () => {
 	})
 }
 
-// Watch source for changes and keep server synchronized with source.
-// For now, this cannot handle directories being renamed or deleted.
-// In those cases, re-running the synchronizer will fix it.
-// TODO: Implement something more graceful.
 const watch_local_files = () => {
-	fs.watch(fs_root, {recursive: true}, (_, rel_path) => {
-		if (rel_path) {
-			if (is_md(rel_path)) {
-				if (fs.existsSync(path.join(fs_root, rel_path))) {
-					// Edit was not a path deletion.
-					save_note(rel_path, `Local edit to file ${rel_path}`)
-				} else {
-					// Edit was a path deletion.
-					// Note: Renames trigger two events, one each for the old
-					// name and the new name. This processes the deletion of the
-					// old one.
-					console.log(`Local deleted file ${rel_path}`)
-					delete_note(rel_path)
-				}
-			}
-		} else {
-			console.error(
-				'Change to file, but rel_path unknown. No action taken.')
-		}
-	})
-}
+	chokidar.watch(fs_root, {ignored: watcher_should_ignore, cwd: fs_root})
+		.on('add', (rel_path) => {
+			save_note(rel_path, `Local added file ${rel_path}`)})
+		.on('change', (rel_path) => {
+			save_note(rel_path, `Local edit to file ${rel_path}`)})
+		.on('unlink', (rel_path) => {
+			console.log(`Local deleted file ${rel_path}`)
+			delete_note(rel_path)
+		})
+	}
 
 write_back_changes = () => {
 	bus.fetch('/all_notes').list.forEach((note_key) => {
@@ -131,15 +104,17 @@ write_back_changes = () => {
 
 // Utils
 
-const is_private = filepath => Array.from(path.basename(filepath))[0] === '.'
+const is_private = filepath => /^\.|\/\./.test(filepath)
 const is_md = filepath => path.extname(filepath) === '.md'
 const is_dir = (filepath) => {
 	return fs.existsSync(filepath) && fs.lstatSync(filepath).isDirectory()
 }
+const watcher_should_ignore = (filepath) => {
+	return is_private(filepath) || !['', '.md'].includes(path.extname(filepath))
+}
 
 // Execution
 
-recursive_save()
 bus.once(register_deletions)
 bus(() => {
 	if (check_deletions()) {
