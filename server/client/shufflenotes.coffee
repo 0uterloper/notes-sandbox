@@ -1,6 +1,11 @@
 FRONTMATTER_PATTERN = /^---\n(?:.*\n)*---\n/
 HEX_COLOR_PATTERN = /^#[0-9A-F]{6}$/i
 
+MQ_KEY_PREFIX = '/metadata_question/'
+
+# Apparently SELECT tags can only have strings as value, not null...
+NULL = 'none'
+
 SERVER_ADDRESS = 'http://127.0.0.1:3000'
 
 OBSIDIAN_VAULT_NAME = 'Personal notes'
@@ -19,6 +24,8 @@ COLOR_MAP =
   pink: '#F7D1E7'
   brown: '#E1CAAC'
   gray: '#E8EAED'
+
+# DOM
 
 dom.BODY = -> MAIN_CONTAINER()
 
@@ -39,10 +46,48 @@ dom.SIDE_PANEL = ->
 dom.SHUFFLE_AREA = ->
   DIV {},
     id: 'shuffle_area'
+    METADATA_QUESTION_DROPDOWN()
+    if current_mq_short_label() == NULL
+      BR()
+    else
+      METADATA_GAME()
     BUTTON_CONTAINER()
     NOTE_CONTAINER()
     BR()
     TAGS_CONTAINER()
+
+dom.METADATA_QUESTION_DROPDOWN = ->
+  DIV {},
+    LABEL {},
+      htmlFor: 'metadata_question'
+      'Metadata question:'
+    select = SELECT {},
+      name: 'metadata_question'
+      id: 'metadata_question'
+      value: current_mq_short_label()
+      onChange: (event) => set_metadata_question_by_label event.target.value
+      OPTION {},
+        value: NULL
+        NULL
+      for mq_key in all_metadata_question_keys()
+        mq = bus.fetch mq_key
+        OPTION {},
+          value: mq.short_label
+          mq.short_label
+
+dom.METADATA_GAME = ->
+  DIV {},
+    "#{num_to_label()} / #{bus.fetch('/all_notes').list.length} left to label\n"
+    BR()
+    bus.fetch current_metadata_question_key()
+      .long_question
+    BR()
+    BUTTON {},
+      onClick: -> answer_metadata_question true
+      '✅'
+    BUTTON {},
+      onClick: -> answer_metadata_question false
+      '❌'
 
 dom.BUTTON_CONTAINER = ->
   DIV {},
@@ -114,6 +159,8 @@ dom.SHELF_ENTRY = (note_key) ->
       onClick: => request_specific_note note_key
       note_title note_key
 
+# Logic
+
 request_random_note = ->
   bus.fetch_once('/all_notes', (obj) ->
     options = obj.list
@@ -162,6 +209,7 @@ repack_yaml_headers = (params, content) ->
     frontmatter = jsyaml.dump params
     '---\n' + frontmatter + '---\n\n' + content
 
+# TODO: clean up redundant code in these three fns
 edit_yaml_header_of_current_note = (key, val) ->
   note_obj = current_note()
   {params, content} = unpack_yaml_headers note_obj.content
@@ -169,8 +217,77 @@ edit_yaml_header_of_current_note = (key, val) ->
   note_obj.content = repack_yaml_headers params, content
   bus.save note_obj
 
+add_to_yaml_list = (key, new_val) ->
+  note_obj = current_note()
+  {params, content} = unpack_yaml_headers note_obj.content
+  params[key] ?= []
+  if new_val not in params[key]
+    params[key].push(new_val)
+    note_obj.content = repack_yaml_headers params, content
+    bus.save note_obj
+
+remove_from_yaml_list = (key, del_val) ->
+  note_obj = current_note()
+  {params, content} = unpack_yaml_headers note_obj.content
+  if params[key]?
+    params[key] = params[key].filter((val) -> val != del_val)
+    if params[key].length == 0 then delete params[key]
+    note_obj.content = repack_yaml_headers params, content
+    bus.save note_obj
+
 read_header = (raw_md, key) ->
   unpack_yaml_headers(raw_md).params[key]
+
+answer_metadata_question = (answer) ->
+  mq = bus.fetch current_metadata_question_key()
+  if mq.type != 'bool'
+    console.log("Labeling metadata of type #{mq.type} not yet implemented.")
+    return
+  else  # it's a bool!
+    if answer
+      add_to_yaml_list 'tags', mq.short_label
+    else
+      remove_from_yaml_list 'tags', mq.short_label
+  mq = bus.fetch(current_metadata_question_key())
+  mq.labeling_queue = remove_by_val mq.labeling_queue, current_note_key()
+
+  all_notes_list = bus.fetch('/all_notes').list
+  until mq.labeling_queue.length == 0 or mq.labeling_queue[0] in all_notes_list
+    # Note at front of queue has been deleted; remove it from queue.
+    # TODO: replace by logic on note deletion to handle this.
+    mq.labeling_queue = mq.labeling_queue.slice(1)
+  if mq.labeling_queue.length > 0
+    request_specific_note mq.labeling_queue[0]
+  bus.save(mq)
+
+all_metadata_question_keys = ->
+  bus.fetch('/metadata_questions').list
+current_metadata_question_key = ->
+  bus.fetch('ls/current_metadata_question_key').mq_key
+current_mq_short_label = ->
+  mq_key = current_metadata_question_key()
+  if mq_key == NULL then NULL else bus.fetch(mq_key).short_label
+num_to_label = ->
+  mq_key = current_metadata_question_key()
+  if mq_key == NULL then 0 else bus.fetch(mq_key).labeling_queue.length
+set_metadata_question = (mq_key) ->
+  bus.save
+    key: 'ls/current_metadata_question_key'
+    mq_key: mq_key
+set_metadata_question_by_label = (mq_label) ->
+  if mq_label == NULL
+    set_metadata_question(NULL)
+  else
+    set_metadata_question(MQ_KEY_PREFIX + mq_label)
+
+create_metadata_question = (short_label, long_question=null, type='bool') ->
+  bus.fetch_once '/all_notes', (all_notes) ->
+    bus.save
+      key: MQ_KEY_PREFIX + short_label
+      short_label: short_label
+      long_question: long_question
+      type: type
+      labeling_queue: shuffle all_notes.list
 
 pin_current_note = -> pin_note current_note_key()
 
@@ -194,8 +311,24 @@ encode_obsidian_link = (note_key) ->
   file = encodeURIComponent(bus.fetch(note_key).location)
   "obsidian://open?vault=#{vault}&file=#{file}"
 
+# Utils
+
+# Edited from https://coffeescript-cookbook.github.io/ to not modify `source`.
+shuffle = (source) ->
+  if source.length < 2 then return source
+  copy = [...source]
+  for index in [copy.length-1..1]
+    randomIndex = Math.floor Math.random() * (index + 1)
+    [copy[index], copy[randomIndex]] = [copy[randomIndex], copy[index]]
+  copy
+
+remove_by_val = (arr, val) -> arr.filter((v) -> v != val)
+
+# Execution
+
 init_state = ->
   if not current_note_key()? then request_random_note()
+  if not current_metadata_question_key()? then set_metadata_question NULL
   state['ls/shelf'] ?= []
 
 init_state()
