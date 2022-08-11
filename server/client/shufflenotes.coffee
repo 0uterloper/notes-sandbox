@@ -315,8 +315,8 @@ encode_obsidian_link = (note_key) ->
 
 # Edited from https://coffeescript-cookbook.github.io/ to not modify `source`.
 shuffle = (source) ->
-  if source.length < 2 then return source
   copy = [...source]
+  if source.length < 2 then return copy
   for index in [copy.length-1..1]
     randomIndex = Math.floor Math.random() * (index + 1)
     [copy[index], copy[randomIndex]] = [copy[randomIndex], copy[index]]
