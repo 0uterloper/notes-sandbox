@@ -2,6 +2,7 @@
   "devDependencies": {
     "chokidar": "^3.5.3",
     "coffeescript": "^2.7.0",
+    "js-yaml": "^4.1.0",
     "statebus": "^6.1.25"
   }
 }

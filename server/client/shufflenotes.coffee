@@ -226,8 +226,8 @@ add_to_yaml_list = (key, new_val) ->
     note_obj.content = repack_yaml_headers params, content
     bus.save note_obj
 
-remove_from_yaml_list = (key, del_val) ->
-  note_obj = current_note()
+remove_from_yaml_list = (key, del_val, note_obj=null) ->
+  note_obj ?= current_note()
   {params, content} = unpack_yaml_headers note_obj.content
   if params[key]?
     params[key] = params[key].filter((val) -> val != del_val)
@@ -248,6 +248,8 @@ answer_metadata_question = (answer) ->
       add_to_yaml_list 'tags', mq.short_label
     else
       remove_from_yaml_list 'tags', mq.short_label
+
+  # Advance labeling_queue
   mq = bus.fetch(current_metadata_question_key())
   mq.labeling_queue = remove_by_val mq.labeling_queue, current_note_key()
 
@@ -259,6 +261,18 @@ answer_metadata_question = (answer) ->
   if mq.labeling_queue.length > 0
     request_specific_note mq.labeling_queue[0]
   bus.save(mq)
+
+delete_metadata_question = (mq_key, wipe_from_md=true) ->
+  short_label = bus.fetch(mq_key).short_label
+  if short_label == current_mq_short_label()
+    set_metadata_question NULL
+
+  bus.delete mq_key
+  if wipe_from_md
+    bus.fetch_once '/all_notes', (all_notes) ->
+      all_notes.list.forEach (note_key) ->
+        bus.fetch_once note_key, (note_obj) ->
+          remove_from_yaml_list 'tags', short_label, note_obj
 
 all_metadata_question_keys = ->
   bus.fetch('/metadata_questions').list
