@@ -25,6 +25,10 @@ COLOR_MAP =
   brown: '#E1CAAC'
   gray: '#E8EAED'
 
+DEFAULT_NOTE =
+  location: 'fake note'
+  content: 'no note has loaded yet'
+
 # DOM
 
 dom.BODY = -> MAIN_CONTAINER()
@@ -130,7 +134,7 @@ dom.NOTE_CONTAINER = ->
       id: 'note_title'
       A {},
         textDecoration: 'none'
-        href: encode_obsidian_link current_note_key()
+        href: encode_obsidian_link()
         '🖊'
       ' ' + note_title()
     BR()
@@ -183,7 +187,9 @@ map_over_notes = (fn) ->
           bus.save note
 
 current_note_key = -> bus.fetch('ls/current_note_key').note_key
-current_note = -> bus.fetch current_note_key()
+current_note = ->
+  note_key = current_note_key()
+  if note_key? then bus.fetch note_key else DEFAULT_NOTE
 current_note_text = -> unpack_yaml_headers(current_note().content).content
 current_note_headers = -> unpack_yaml_headers(current_note().content).params
 note_color = (note_key=null) ->
@@ -320,9 +326,9 @@ get_color_values = (color_string) ->
 change_current_note_color = (new_color) ->
   edit_yaml_header_of_current_note('color', new_color)
 
-encode_obsidian_link = (note_key) ->
+encode_obsidian_link = ->
   vault = encodeURIComponent(OBSIDIAN_VAULT_NAME)
-  file = encodeURIComponent(bus.fetch(note_key).location)
+  file = encodeURIComponent(current_note().location)
   "obsidian://open?vault=#{vault}&file=#{file}"
 
 # Utils
