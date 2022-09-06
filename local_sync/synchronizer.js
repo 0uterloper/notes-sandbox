@@ -7,9 +7,17 @@ bus.honk = false
 
 const WRITE_TO_FS = true
 
-const fs_root = '/Users/davisfoote/Documents/obsidian/Personal notes/'
+var fs_root
 
 const note_key_prefix = '/note/'
+
+// Add a config.js file that exports fs_root, the directory where notes live.
+// Alternatively, hard code it as a global variable assignment above.
+if (fs.existsSync('./config.js')) {
+	fs_root = require('./config.js').fs_root
+} else if (typeof(fs_root) === 'undefined') {
+	throw new Error('Please configure fs_root (see synchronizer.js)')
+}
 
 const save_note = (rel_path, msg_on_save=null) => {
 	const abs_path = path.join(fs_root, rel_path)

@@ -1,4 +1,4 @@
-/server/storage/markdown/*
+/local_sync/config.js
 .DS_Store
 node_modules
 backups
