@@ -8,7 +8,7 @@ NULL = 'none'
 
 SERVER_ADDRESS = 'http://127.0.0.1:3000'
 
-OBSIDIAN_VAULT_NAME = 'Personal notes'
+OBSIDIAN_VAULT_NAME = 'obsidian'
 
 DEFAULT_COLOR = '#ffffff'
 COLOR_MAP =
@@ -331,6 +331,13 @@ encode_obsidian_link = ->
   file = encodeURIComponent(current_note().location)
   "obsidian://open?vault=#{vault}&file=#{file}"
 
+# Spaced Repetition
+post_v_rating = (note_key, v_score) ->
+  xhr = new XMLHttpRequest()
+  xhr.open 'POST', "/v_rating/#{encodeURIComponent note_key}/#{v_score}"
+  xhr.send()
+  xhr.onloadend = -> console.log xhr.response
+
 # Utils
 
 # Edited from https://coffeescript-cookbook.github.io/ to not modify `source`.
@@ -343,6 +350,9 @@ shuffle = (source) ->
   copy
 
 remove_by_val = (arr, val) -> arr.filter((v) -> v != val)
+
+slash = (key) -> if key[0] == '/' then key else '/' + key
+deslash = (key) -> if key[0] == '/' then key.slice(1) else key
 
 # Execution
 

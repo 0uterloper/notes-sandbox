@@ -1,13 +1,17 @@
 jsyaml = require 'js-yaml'
+path = require 'path'
 bus = require('statebus').serve
   port: 3006
 
-bus.http.use('/static', require('express').static('static'))
+bus.http.use '/static', require('express').static('static')
+bus.http.get '/', (req, res) -> res.redirect '/shufflenotes'
+bus.http.get '/shufflenotes',
+  (req, res) -> res.sendFile path.join __dirname, '/client/shufflenotes.html'
 
 FRONTMATTER_PATTERN = /^---\n(?:.*\n)*---\n/
 
-slash = (key) -> '/' + key
-deslash = (key) -> key.slice(1)
+slash = (key) -> if key[0] == '/' then key else '/' + key
+deslash = (key) -> if key[0] == '/' then key.slice(1) else key
 
 initialize_key_list = (key) ->
   bus.fetch key, (obj) ->
@@ -82,9 +86,9 @@ manage_list_of_keys 'dead_metadata_question/*', 'metadata_graveyard'
 
 ONE_DAY = 1000 * 60 * 60 * 24
 
-initialize_sm2_params = (note_obj) ->
+initialize_sm2_params = (note_obj, force=false) ->
   {params, content} = unpack_yaml_headers note_obj.content
-  if params.sm2? then return note_obj
+  if not force and (params.sm2? or not note_obj.content?) then return note_obj
   params.sm2 =
     vf: 2.5
     num_reps: 0
@@ -130,24 +134,34 @@ bus('next_note').to_fetch = (key, t) ->
     key: 'next_note'
     note_key: deslash soonest.note_key
 
-# Syntax: 'v_rating/<note_key (including 'note/')>/<numerical v score>'
-bus('v_rating/*').to_save = (obj) ->
-  tokens = obj.key.replace('//', '/').split('/')
-  note_key = tokens.slice(1, -1).join('/')
-  v_score = parseInt tokens[tokens.length - 1]
-  if 0 <= v_score <= 5  # Will be false if v_score is NaN.
-    note_obj = initialize_sm2_params bus.fetch note_key
-    {params, content} = unpack_yaml_headers note_obj.content
-    params.sm2 = iterate_sm2_algo params.sm2, v_score
-    note_obj.content = repack_yaml_headers params, content
+bus.http.post '/v_rating/:note_key/:v_score', (req, res) ->
+  try
+    save_v_rating req.params.note_key, req.params.v_score
+    res.end()
+  catch e
+    res.status(400)
+    res.send(e.message)
 
-    # Save the rating for future reference.
-    note_obj.v_rating_history ?= []
-    note_obj.v_rating_history.push
-      date: new Date().toString()
-      v_score: v_score
+# Ontology: the number itself is the score; the pair (note, score) is a rating.
+save_v_rating = (note_key, v_score_string) ->
+  note_obj = bus.fetch deslash note_key
+  if not note_obj.content?
+    throw new Error("Rating submitted for nonexistent note #{note_key}")
+  v_score = parseInt v_score_string
+  if not (0 <= v_score <= 5)  # v_score is out of bounds or NaN.
+    throw new Error("Invalid v_score submitted: #{v_score_string}")
 
-    console.log 'HERE IT IS', note_obj
-    # bus.save note_obj
+  note_obj = initialize_sm2_params note_obj
 
-  bus.save.abort obj
+  {params, content} = unpack_yaml_headers note_obj.content
+  console.log params
+  params.sm2 = iterate_sm2_algo params.sm2, v_score
+  note_obj.content = repack_yaml_headers params, content
+
+  # Save the rating for future reference.
+  note_obj.v_rating_history ?= []
+  note_obj.v_rating_history.push
+    date: new Date().toString()
+    v_score: v_score
+
+  bus.save note_obj
