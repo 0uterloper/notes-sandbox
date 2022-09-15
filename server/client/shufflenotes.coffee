@@ -149,7 +149,15 @@ dom.TAGS_CONTAINER = ->
       id: 'tags_text'
       'Tags:'
       UL {},
-        LI "#{k}: #{v}" for k, v of current_note_headers()
+        (RECURSIVE_BULLETS k: k, v: v) for k, v of current_note_headers()
+
+dom.RECURSIVE_BULLETS = (k, v) ->
+  if v? and typeof v == 'object'
+    LI "#{k}:",
+    UL {},
+      (RECURSIVE_BULLETS k:_k, v:_v) for _k, _v of v
+  else
+    LI "#{k}: #{v}"
 
 dom.SHELF_ENTRY = (note_key) ->
   DIV {},
