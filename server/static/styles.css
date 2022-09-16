@@ -1,7 +1,3 @@
-.flex_container {
-	display: flex;
-}
-
 #main_container {
 	position: absolute;
 	top: 0;
@@ -75,4 +71,15 @@ button {
 
 #pin_button {
 	background-image: url('https://icons.iconarchive.com/icons/paomedia/small-n-flat/256/pin-icon.png');
+}
+
+#spaced_repetition_controls_container button {
+	background-color: #FEF388;
+	padding: 0;
+    line-height: 24px;
+    text-align: center;
+}
+
+#spaced_repetition_controls_container button:hover {
+	background-color: #D6FD9D;
 }

@@ -43,6 +43,21 @@ dom.MAIN_CONTAINER = ->
 dom.SIDE_PANEL = ->
   DIV {},
     id: 'side_panel'
+    DIV {},
+      fontSize: 12
+      color: if state['ls/spaced_repetition_active'] then 'black' else 'white'
+      paddingLeft: '10px'
+      paddingTop: '10px'
+      marginBottom: '10px'
+      marginRight: '10px'
+      borderBottom: '1px dashed black'
+      "5 - imminently valuable for current context", BR()
+      "4 - definitely valuable, not for current context", BR()
+      "3 - probable future value", BR()
+      "2 - possible future value", BR()
+      "1 - not likely of value; don't want to discard", BR()
+      "0 - no apparent reason to revisit this", BR()
+      BR()
     for note_key in state['ls/shelf'] ? []
       SHELF_ENTRY
         note_key: note_key
@@ -102,14 +117,31 @@ dom.BUTTON_CONTAINER = ->
       BUTTON {},
         id: 'shuffle_button'
         onClick: request_random_note
-    DIV {},
-      flex: '1 1 100px'
+    SPACED_REPETITION_CONTROLS()
+    DIV flex: '1 0 0px'  # Spacer.
     COLOR_DROPDOWN()
     DIV {},
       flex: '0 0 10px'
       BUTTON {},
         id: 'pin_button'
         onClick: pin_current_note
+
+dom.SPACED_REPETITION_CONTROLS = ->
+  DIV {},
+    display: 'flex'
+    id: 'spaced_repetition_controls_container'
+    if state['ls/spaced_repetition_active']
+      DIV {},
+        BUTTON '🌝', onClick: -> state['ls/spaced_repetition_active'] = false
+        BUTTON '⓪', onClick: -> score_note 0
+        BUTTON '①', onClick: -> score_note 1
+        BUTTON '②', onClick: -> score_note 2
+        BUTTON '③', onClick: -> score_note 3
+        BUTTON '④', onClick: -> score_note 4
+        BUTTON '⑤', onClick: -> score_note 5
+        BUTTON '➡', onClick: -> score_note null
+    else
+      BUTTON '🌚', onClick: -> state['ls/spaced_repetition_active'] = true 
 
 dom.COLOR_DROPDOWN = ->
   DIV {},
@@ -340,6 +372,13 @@ encode_obsidian_link = ->
   "obsidian://open?vault=#{vault}&file=#{file}"
 
 # Spaced Repetition
+request_next_note = ->
+  bus.fetch '/next_note', (obj) -> request_specific_note obj.note_key
+
+score_note = (v_score) ->
+  post_v_rating current_note_key(), v_score
+  request_next_note()
+
 post_v_rating = (note_key, v_score) ->
   xhr = new XMLHttpRequest()
   xhr.open 'POST', "/v_rating/#{encodeURIComponent note_key}/#{v_score}"

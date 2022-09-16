@@ -81,6 +81,14 @@ manage_list_of_keys 'metadata_question/*', 'metadata_questions', null,
   [move_to_graveyard_and_add_labeled_notes]
 manage_list_of_keys 'dead_metadata_question/*', 'metadata_graveyard'
 
+# Edited from https://coffeescript-cookbook.github.io/ to not modify `source`.
+shuffle = (source) ->
+  copy = [...source]
+  if source.length < 2 then return copy
+  for index in [copy.length-1..1]
+    randomIndex = Math.floor Math.random() * (index + 1)
+    [copy[index], copy[randomIndex]] = [copy[randomIndex], copy[index]]
+  copy
 
 # Spaced repetition
 
@@ -107,11 +115,12 @@ iterate_sm2_algo = (sm2_params, v_score) ->
     sm2_params.interval *= sm2_params.vf
   sm2_params.num_reps += 1
 
-  sm2_params.vf = sm2_params.vf + (0.1 - v_score * (0.08 + v_score * 0.02))
-  if sm2_params.vf < 1.3 then sm2_params.vf = 1.3
+  if v_score?
+    sm2_params.vf = sm2_params.vf + (0.1 - v_score * (0.08 + v_score * 0.02))
+    if sm2_params.vf < 1.3 then sm2_params.vf = 1.3
 
-  if v_score >= 3
-    sm2_params.num_reps = 0
+    if v_score >= 3
+      sm2_params.num_reps = 0
 
   sm2_params.next_rep = 
     new Date(new Date().getTime() + sm2_params.interval).toString()
@@ -132,7 +141,7 @@ bus('next_note').to_fetch = (key, t) ->
       soonest.time = note_time
   return
     key: 'next_note'
-    note_key: deslash soonest.note_key
+    note_key: deslash soonest.note_key  # Deslash due to statebus oddity.
 
 bus.http.post '/v_rating/:note_key/:v_score', (req, res) ->
   try
@@ -147,14 +156,14 @@ save_v_rating = (note_key, v_score_string) ->
   note_obj = bus.fetch deslash note_key
   if not note_obj.content?
     throw new Error("Rating submitted for nonexistent note #{note_key}")
-  v_score = parseInt v_score_string
+  v_score = if v_score_string == 'null' then null else parseInt v_score_string
   if not (0 <= v_score <= 5)  # v_score is out of bounds or NaN.
+    # Incidentally, 0 <= null evaluates to true, so this handles the null case.
     throw new Error("Invalid v_score submitted: #{v_score_string}")
 
   note_obj = initialize_sm2_params note_obj
 
   {params, content} = unpack_yaml_headers note_obj.content
-  console.log params
   params.sm2 = iterate_sm2_algo params.sm2, v_score
   note_obj.content = repack_yaml_headers params, content
 
