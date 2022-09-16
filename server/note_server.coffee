@@ -46,24 +46,6 @@ repack_yaml_headers = (params, content) ->
     frontmatter = jsyaml.dump params
     '---\n' + frontmatter + '---\n\n' + content
 
-move_to_graveyard_and_add_labeled_notes = (delete_key) ->
-  bus.fetch_once delete_key, (mq_obj) ->
-    if not mq_obj.short_label?
-      return  # No MQ in DB for this key.
-    # Copy to metadata graveyard
-    mq_obj.key = 'dead_metadata_question/' + mq_obj.short_label
-    delete mq_obj.labeling_queue
-    mq_obj.labeled_notes = []
-    bus.save mq_obj
-    bus.fetch_once 'all_notes', (all_notes) ->
-      all_notes.list.forEach (note_key) ->
-        bus.fetch_once deslash note_key, (note_obj) ->
-          if mq_obj.type == 'bool'
-            tags = unpack_yaml_headers(note_obj.content).params.tags
-            if tags? and tags.includes mq_obj.short_label
-              mq_obj.labeled_notes.push note_key
-              bus.save mq_obj
-
 manage_list_of_keys = (key_pattern, list_key,
                        save_handlers=null, delete_handlers=null) ->
   initialize_key_list list_key
@@ -77,9 +59,6 @@ manage_list_of_keys = (key_pattern, list_key,
     t.done()
 
 manage_list_of_keys 'note/*', 'all_notes'
-manage_list_of_keys 'metadata_question/*', 'metadata_questions', null,
-  [move_to_graveyard_and_add_labeled_notes]
-manage_list_of_keys 'dead_metadata_question/*', 'metadata_graveyard'
 
 # Edited from https://coffeescript-cookbook.github.io/ to not modify `source`.
 shuffle = (source) ->
