@@ -1,8 +1,6 @@
 FRONTMATTER_PATTERN = /^---\n(?:.*\n)*---\n/
 HEX_COLOR_PATTERN = /^#[0-9A-F]{6}$/i
 
-SERVER_ADDRESS = 'http://127.0.0.1:3000'
-
 OBSIDIAN_VAULT_NAME = 'obsidian'
 
 DEFAULT_COLOR = '#ffffff'
@@ -30,21 +28,23 @@ dom.BODY = -> MAIN_CONTAINER()
 
 dom.MAIN_CONTAINER = ->
   DIV {},
-    id: 'main_container'
+    position: 'absolute'
+    top: 0
+    bottom: 0
+    width: '100%'
     display: 'flex'
     SIDE_PANEL()
     SHUFFLE_AREA()
 
 dom.SIDE_PANEL = ->
   DIV {},
-    id: 'side_panel'
+    flex: '1 1 200px'
+    wordWrap: 'break-word'
+    borderRight: '1px solid gray'
     DIV {},
       fontSize: 12
       color: if state['ls/spaced_repetition_active'] then 'black' else 'white'
-      paddingLeft: '10px'
-      paddingTop: '10px'
-      marginBottom: '10px'
-      marginRight: '10px'
+      margin: '10px'
       borderBottom: '1px dashed black'
       "5 - imminently valuable for current context", BR()
       "4 - definitely valuable, not for current context", BR()
@@ -59,7 +59,8 @@ dom.SIDE_PANEL = ->
 
 dom.SHUFFLE_AREA = ->
   DIV {},
-    id: 'shuffle_area'
+    flex: '5 5 200px'
+    padding: '10px'
     BUTTON_CONTAINER()
     NOTE_CONTAINER()
     BR()
@@ -67,21 +68,22 @@ dom.SHUFFLE_AREA = ->
 
 dom.BUTTON_CONTAINER = ->
   DIV {},
-    id: 'button_container'
+    margin: 'auto'
+    width: '400px'
     display: 'flex'
     DIV {},
       flex: '0 0 10px'
       BUTTON {},
-        id: 'shuffle_button'
         onClick: request_random_note
+        '🔀'
     SPACED_REPETITION_CONTROLS()
     DIV flex: '1 0 0px'  # Spacer.
     COLOR_DROPDOWN()
     DIV {},
       flex: '0 0 10px'
       BUTTON {},
-        id: 'pin_button'
         onClick: pin_current_note
+        '📌'
 
 dom.SPACED_REPETITION_CONTROLS = ->
   DIV {},
@@ -117,10 +119,17 @@ dom.COLOR_DROPDOWN = ->
 
 dom.NOTE_CONTAINER = ->
   DIV {},
-    id: 'note_container'
+    margin: 'auto'
+    width: '400px'
+    border: '1px solid gray'
+    padding: '10px'
+    borderRadius: '5px'
+    marginTop: '5px'
     backgroundColor: get_color_values note_color()
     DIV {},
-      id: 'note_title'
+      fontSize: 'large'
+      fontWeight: 'bold'
+      fontFamily: 'Futura'
       A {},
         textDecoration: 'none'
         href: encode_obsidian_link()
@@ -128,14 +137,18 @@ dom.NOTE_CONTAINER = ->
       ' ' + note_title()
     BR()
     DIV {},
-      id: 'note_text'
+      fontSize: 'small'
+      fontFamily: 'Verdana'
+      whiteSpace: 'pre-wrap'
       current_note_text()
 
 dom.TAGS_CONTAINER = ->
   DIV {},
-    id: 'tags_container'
+    margin: 'auto'
+    width: '400px'
     DIV {},
-      id: 'tags_text'
+      fontSize: 'medium'
+      fontFamily: 'Verdana'
       'Tags:'
       UL {},
         (RECURSIVE_BULLETS k: k, v: v) for k, v of current_note_headers()
