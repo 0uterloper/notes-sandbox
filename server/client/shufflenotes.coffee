@@ -278,7 +278,10 @@ encode_obsidian_link = ->
 
 # Spaced Repetition
 request_next_note = ->
-  bus.fetch '/next_note', (obj) -> request_specific_note obj.note_key
+  xhr = new XMLHttpRequest()
+  xhr.open 'GET', '/next_note'
+  xhr.send()
+  xhr.onloadend = -> request_specific_note xhr.response
 
 score_note = (v_score) ->
   post_v_rating current_note_key(), v_score

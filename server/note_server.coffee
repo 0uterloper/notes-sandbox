@@ -97,21 +97,7 @@ iterate_sm2_algo = (sm2_params, v_score) ->
   
   sm2_params
 
-bus('next_note').to_fetch = (key, t) ->
-  soonest = 
-    note_key: null
-    time: Infinity
-  bus.fetch_once 'all_notes', (an) -> an.list.forEach (note_key) ->
-    note_obj = initialize_sm2_params bus.fetch deslash note_key
-    {params, content} = unpack_yaml_headers note_obj.content
-    note_time = new Date(params.sm2?.next_rep).getTime()
-    if note_time < soonest.time
-      # If lookup failed, note_time is NaN and this is false.
-      soonest.note_key = note_key
-      soonest.time = note_time
-  return
-    key: 'next_note'
-    note_key: deslash soonest.note_key  # Deslash due to statebus oddity.
+bus.http.get '/next_note', (req, res) -> send_next_note res
 
 bus.http.post '/v_rating/:note_key/:v_score', (req, res) ->
   try
@@ -120,6 +106,23 @@ bus.http.post '/v_rating/:note_key/:v_score', (req, res) ->
   catch e
     res.status(400)
     res.send(e.message)
+
+send_next_note = (res) ->
+  soonest =
+    note_key: null
+    time: Infinity
+  bus.fetch_once 'all_notes', (an) ->
+    count = remaining: an.list.length
+    an.list.forEach (note_key) ->
+      bus.fetch_once deslash(note_key), (note_obj) ->
+        initialize_sm2_params note_obj
+        {params, content} = unpack_yaml_headers note_obj.content
+        note_time = new Date(params.sm2?.next_rep).getTime()
+        if note_time < soonest.time
+          # If lookup failed, note_time is NaN and this is false.
+          soonest.note_key = note_key
+          soonest.time = note_time
+        if --count.remaining <= 0 then res.send soonest.note_key
 
 # Ontology: the number itself is the score; the pair (note, score) is a rating.
 save_v_rating = (note_key, v_score_string) ->
