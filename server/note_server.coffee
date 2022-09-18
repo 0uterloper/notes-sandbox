@@ -101,7 +101,7 @@ bus('next_note').to_fetch = (key, t) ->
   soonest = 
     note_key: null
     time: Infinity
-  bus.fetch('all_notes').list.forEach (note_key) ->
+  bus.fetch_once 'all_notes', (an) -> an.list.forEach (note_key) ->
     note_obj = initialize_sm2_params bus.fetch deslash note_key
     {params, content} = unpack_yaml_headers note_obj.content
     note_time = new Date(params.sm2?.next_rep).getTime()
