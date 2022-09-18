@@ -290,22 +290,6 @@ post_v_rating = (note_key, v_score) ->
   xhr.send()
   xhr.onloadend = -> console.log xhr.response
 
-# Utils
-
-# Edited from https://coffeescript-cookbook.github.io/ to not modify `source`.
-shuffle = (source) ->
-  copy = [...source]
-  if source.length < 2 then return copy
-  for index in [copy.length-1..1]
-    randomIndex = Math.floor Math.random() * (index + 1)
-    [copy[index], copy[randomIndex]] = [copy[randomIndex], copy[index]]
-  copy
-
-remove_by_val = (arr, val) -> arr.filter((v) -> v != val)
-
-slash = (key) -> if key[0] == '/' then key else '/' + key
-deslash = (key) -> if key[0] == '/' then key.slice(1) else key
-
 # Execution
 
 init_state = ->

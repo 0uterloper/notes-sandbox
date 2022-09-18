@@ -60,15 +60,6 @@ manage_list_of_keys = (key_pattern, list_key,
 
 manage_list_of_keys 'note/*', 'all_notes'
 
-# Edited from https://coffeescript-cookbook.github.io/ to not modify `source`.
-shuffle = (source) ->
-  copy = [...source]
-  if source.length < 2 then return copy
-  for index in [copy.length-1..1]
-    randomIndex = Math.floor Math.random() * (index + 1)
-    [copy[index], copy[randomIndex]] = [copy[randomIndex], copy[index]]
-  copy
-
 # Spaced repetition
 
 ONE_DAY = 1000 * 60 * 60 * 24
