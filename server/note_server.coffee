@@ -29,23 +29,6 @@ remove_key_by_value = (list_key, delete_key) ->
     list_obj.list = list_obj.list.filter (key) -> key != slash delete_key
     bus.save list_obj
 
-# Logic ~copied from shufflenotes.coffee.
-# TODO: Move this to a utils/common file to remove the duplication.
-unpack_yaml_headers = (raw_md) ->
-  has_frontmatter = FRONTMATTER_PATTERN.test(raw_md)
-  if has_frontmatter
-    content_index = raw_md.indexOf('\n---')
-    {params: jsyaml.load(raw_md.slice('---\n'.length, content_index)),
-     content: raw_md.slice(content_index + '\n---'.length).trimStart()}
-  else
-    {params: {}, content: raw_md}
-
-repack_yaml_headers = (params, content) ->
-  if Object.keys(params).length == 0 then content
-  else
-    frontmatter = jsyaml.dump params
-    '---\n' + frontmatter + '---\n\n' + content
-
 manage_list_of_keys = (key_pattern, list_key,
                        save_handlers=null, delete_handlers=null) ->
   initialize_key_list list_key
