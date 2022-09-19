@@ -277,21 +277,84 @@ encode_obsidian_link = ->
   "obsidian://open?vault=#{vault}&file=#{file}"
 
 # Spaced Repetition
-request_next_note = ->
-  xhr = new XMLHttpRequest()
-  xhr.open 'GET', '/next_note'
-  xhr.send()
-  xhr.onloadend = -> request_specific_note xhr.response
+
+ONE_DAY = 1000 * 60 * 60 * 24
+
+initialize_sm2_params = (note_obj, force=false) ->
+  {params, content} = unpack_yaml_headers note_obj.content
+  if not force and (params.sm2? or not note_obj.content?) then return note_obj
+  params.sm2 =
+    vf: 2.5
+    num_reps: 0
+    interval: 0
+    next_rep: new Date().toString()
+  note_obj.content = repack_yaml_headers params, content
+  bus.save note_obj
+  note_obj
+
+iterate_sm2_algo = (sm2_params, v_score) ->
+  if sm2_params.num_reps == 0
+    sm2_params.interval = ONE_DAY
+  else if sm2_params.num_reps == 1
+    sm2_params.interval = 6 * ONE_DAY
+  else
+    sm2_params.interval *= sm2_params.vf
+  sm2_params.num_reps += 1
+
+  if v_score?
+    sm2_params.vf = sm2_params.vf + (0.1 - v_score * (0.08 + v_score * 0.02))
+    if sm2_params.vf < 1.3 then sm2_params.vf = 1.3
+
+    if v_score >= 3
+      sm2_params.num_reps = 0
+
+  sm2_params.next_rep = 
+    new Date(new Date().getTime() + sm2_params.interval).toString()
+  
+  sm2_params
+
+request_next_note = (excluding=null) ->
+  soonest =
+    note_key: null
+    time: Infinity
+  bus.fetch_once '/all_notes', (all_notes) ->
+    count = remaining: all_notes.list.length
+    all_notes.list.forEach (note_key) ->
+      bus.fetch_once note_key, (note_obj) ->
+        if excluding != note_obj.key
+          initialize_sm2_params note_obj
+          {params, content} = unpack_yaml_headers note_obj.content
+          note_time = new Date(params.sm2?.next_rep).getTime()
+          if note_time < soonest.time
+            # If lookup failed, note_time is NaN and this is false.
+            soonest.note_key = note_key
+            soonest.time = note_time
+            # request_specific_note note_key
+            # console.log note_key
+        if --count.remaining <= 0 then request_specific_note soonest.note_key
 
 score_note = (v_score) ->
-  post_v_rating current_note_key(), v_score
-  request_next_note()
+  # post_v_rating current_note_key(), v_score, request_next_note
+  note_key = current_note_key()
+  request_next_note excluding: note_key
+  bus.fetch_once note_key, (note_obj) ->
+    if not (0 <= v_score <= 5)  # v_score is out of bounds or NaN.
+      # Incidentally, 0 <= null evaluates to true; this handles the null case.
+      throw new Error("Invalid v_score submitted: #{v_score}")
 
-post_v_rating = (note_key, v_score) ->
-  xhr = new XMLHttpRequest()
-  xhr.open 'POST', "/v_rating/#{encodeURIComponent note_key}/#{v_score}"
-  xhr.send()
-  xhr.onloadend = -> console.log xhr.response
+    initialize_sm2_params note_obj
+
+    {params, content} = unpack_yaml_headers note_obj.content
+    params.sm2 = iterate_sm2_algo params.sm2, v_score
+    note_obj.content = repack_yaml_headers params, content
+
+    # Save the rating for future reference.
+    note_obj.v_rating_history ?= []
+    note_obj.v_rating_history.push
+      date: new Date().toString()
+      v_score: v_score
+
+    bus.save note_obj
 
 # Execution
 
