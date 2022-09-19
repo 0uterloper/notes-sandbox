@@ -90,6 +90,7 @@ dom.SPACED_REPETITION_CONTROLS = ->
     display: 'flex'
     id: 'spaced_repetition_controls_container'
     if state['ls/spaced_repetition_active']
+      num_unrated = num_unrated_notes()
       DIV {},
         BUTTON '🌝', onClick: -> state['ls/spaced_repetition_active'] = false
         BUTTON '⓪', onClick: -> score_note 0
@@ -99,6 +100,7 @@ dom.SPACED_REPETITION_CONTROLS = ->
         BUTTON '④', onClick: -> score_note 4
         BUTTON '⑤', onClick: -> score_note 5
         BUTTON '➡', onClick: -> score_note null
+        if num_unrated > 0 then " (#{num_unrated} new)"
     else
       BUTTON '🌚', onClick: -> state['ls/spaced_repetition_active'] = true 
 
@@ -285,9 +287,9 @@ initialize_sm2_params = (note_obj, force=false) ->
   if not force and (params.sm2? or not note_obj.content?) then return note_obj
   params.sm2 =
     vf: 2.5
-    num_reps: 0
-    interval: 0
-    next_rep: new Date().toString()
+    num_reps: 1
+    interval: ONE_DAY
+    next_rep: new Date(new Date().getTime() + ONE_DAY).toString()
   note_obj.content = repack_yaml_headers params, content
   bus.save note_obj
   note_obj
@@ -320,23 +322,21 @@ request_next_note = (excluding=null) ->
   bus.fetch_once '/all_notes', (all_notes) ->
     count = remaining: all_notes.list.length
     all_notes.list.forEach (note_key) ->
-      bus.fetch_once note_key, (note_obj) ->
-        if excluding != note_obj.key
-          initialize_sm2_params note_obj
-          {params, content} = unpack_yaml_headers note_obj.content
-          note_time = new Date(params.sm2?.next_rep).getTime()
-          if note_time < soonest.time
-            # If lookup failed, note_time is NaN and this is false.
-            soonest.note_key = note_key
-            soonest.time = note_time
-            # request_specific_note note_key
-            # console.log note_key
-        if --count.remaining <= 0 then request_specific_note soonest.note_key
+      if excluding == note_key then count.remaining--
+      else bus.fetch_once note_key, (note_obj) ->
+        initialize_sm2_params note_obj
+        {params, content} = unpack_yaml_headers note_obj.content
+        note_time = new Date(params.sm2?.next_rep).getTime()
+        if note_time < soonest.time
+          # If lookup failed, note_time is NaN and this is false.
+          soonest.note_key = note_key
+          soonest.time = note_time
+        if --count.remaining <= 0
+          request_specific_note soonest.note_key
 
 score_note = (v_score) ->
-  # post_v_rating current_note_key(), v_score, request_next_note
   note_key = current_note_key()
-  request_next_note excluding: note_key
+  request_next_note note_key
   bus.fetch_once note_key, (note_obj) ->
     if not (0 <= v_score <= 5)  # v_score is out of bounds or NaN.
       # Incidentally, 0 <= null evaluates to true; this handles the null case.
@@ -355,6 +355,13 @@ score_note = (v_score) ->
       v_score: v_score
 
     bus.save note_obj
+
+num_unrated_notes = ->
+  unrated = count: 0
+  bus.fetch('/all_notes').list.forEach (note_key) ->
+    note_obj = bus.fetch note_key
+    if not note_obj.v_rating_history then unrated.count++
+  unrated.count
 
 # Execution
 
