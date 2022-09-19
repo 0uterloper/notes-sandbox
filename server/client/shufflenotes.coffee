@@ -177,12 +177,12 @@ dom.SHELF_ENTRY = (note_key) ->
 
 # Logic
 
+random_choice = (list) ->
+  list[Math.floor(Math.random() * list.length)]
+
 request_random_note = ->
-  bus.fetch_once('/all_notes', (obj) ->
-    options = obj.list
-    note_key = options[Math.floor(Math.random() * options.length)]
-    request_specific_note note_key
-  )
+  bus.fetch_once '/all_notes', (all_notes) ->
+    request_specific_note random_choice all_notes.list
 
 request_specific_note = (note_key) ->
   bus.save
@@ -317,8 +317,8 @@ iterate_sm2_algo = (sm2_params, v_score) ->
 
 request_next_note = (excluding=null) ->
   soonest =
-    note_key: null
-    time: Infinity
+    note_keys: []
+    day: Infinity
   bus.fetch_once '/all_notes', (all_notes) ->
     count = remaining: all_notes.list.length
     all_notes.list.forEach (note_key) ->
@@ -326,13 +326,16 @@ request_next_note = (excluding=null) ->
       else bus.fetch_once note_key, (note_obj) ->
         initialize_sm2_params note_obj
         {params, content} = unpack_yaml_headers note_obj.content
-        note_time = new Date(params.sm2?.next_rep).getTime()
-        if note_time < soonest.time
-          # If lookup failed, note_time is NaN and this is false.
-          soonest.note_key = note_key
-          soonest.time = note_time
+        # Group notes scheduled for the same day.
+        note_day = new Date(params.sm2?.next_rep).getTime() // ONE_DAY
+        if note_day == soonest.day
+          soonest.note_keys.push note_key
+        else if note_day < soonest.day
+          soonest.note_keys = [note_key]
+          soonest.day = note_day
         if --count.remaining <= 0
-          request_specific_note soonest.note_key
+          # Pick a random note among the ones scheduled for the soonest day.
+          request_specific_note random_choice soonest.note_keys
 
 score_note = (v_score) ->
   note_key = current_note_key()
