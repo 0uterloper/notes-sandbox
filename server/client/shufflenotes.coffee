@@ -1,14 +1,7 @@
 FRONTMATTER_PATTERN = /^---\n(?:.*\n)*---\n/
 HEX_COLOR_PATTERN = /^#[0-9A-F]{6}$/i
 
-MQ_KEY_PREFIX = '/metadata_question/'
-
-# Apparently SELECT tags can only have strings as value, not null...
-NULL = 'none'
-
-SERVER_ADDRESS = 'http://127.0.0.1:3000'
-
-OBSIDIAN_VAULT_NAME = 'Personal notes'
+OBSIDIAN_VAULT_NAME = 'obsidian'
 
 DEFAULT_COLOR = '#ffffff'
 COLOR_MAP =
@@ -35,81 +28,81 @@ dom.BODY = -> MAIN_CONTAINER()
 
 dom.MAIN_CONTAINER = ->
   DIV {},
-    id: 'main_container'
+    position: 'absolute'
+    top: 0
+    bottom: 0
+    width: '100%'
     display: 'flex'
     SIDE_PANEL()
     SHUFFLE_AREA()
 
 dom.SIDE_PANEL = ->
   DIV {},
-    id: 'side_panel'
+    flex: '1 1 200px'
+    wordWrap: 'break-word'
+    borderRight: '1px solid gray'
+    DIV {},
+      fontSize: 12
+      color: if state['ls/spaced_repetition_active'] then 'black' else 'white'
+      margin: '10px'
+      borderBottom: '1px dashed black'
+      "5 - imminently valuable for current context", BR()
+      "4 - definitely valuable, not for current context", BR()
+      "3 - probable future value", BR()
+      "2 - possible future value", BR()
+      "1 - not likely of value; don't want to discard", BR()
+      "0 - no apparent reason to revisit this", BR()
+      BR()
     for note_key in state['ls/shelf'] ? []
       SHELF_ENTRY
         note_key: note_key
 
 dom.SHUFFLE_AREA = ->
   DIV {},
-    id: 'shuffle_area'
-    METADATA_QUESTION_DROPDOWN()
-    if current_mq_short_label() == NULL
-      BR()
-    else
-      METADATA_GAME()
+    flex: '5 5 200px'
+    padding: '10px'
     BUTTON_CONTAINER()
     NOTE_CONTAINER()
     BR()
     TAGS_CONTAINER()
 
-dom.METADATA_QUESTION_DROPDOWN = ->
-  DIV {},
-    LABEL {},
-      htmlFor: 'metadata_question'
-      'Metadata question:'
-    select = SELECT {},
-      name: 'metadata_question'
-      id: 'metadata_question'
-      value: current_mq_short_label()
-      onChange: (event) => set_metadata_question_by_label event.target.value
-      OPTION {},
-        value: NULL
-        NULL
-      for mq_key in all_metadata_question_keys()
-        mq = bus.fetch mq_key
-        OPTION {},
-          value: mq.short_label
-          mq.short_label
-
-dom.METADATA_GAME = ->
-  DIV {},
-    "#{num_to_label()} / #{bus.fetch('/all_notes').list.length} left to label\n"
-    BR()
-    bus.fetch current_metadata_question_key()
-      .long_question
-    BR()
-    BUTTON {},
-      onClick: -> answer_metadata_question true
-      '✅'
-    BUTTON {},
-      onClick: -> answer_metadata_question false
-      '❌'
-
 dom.BUTTON_CONTAINER = ->
   DIV {},
-    id: 'button_container'
+    margin: 'auto'
+    width: '400px'
     display: 'flex'
     DIV {},
       flex: '0 0 10px'
       BUTTON {},
-        id: 'shuffle_button'
         onClick: request_random_note
-    DIV {},
-      flex: '1 1 100px'
+        '🔀'
+    SPACED_REPETITION_CONTROLS()
+    DIV flex: '1 0 0px'  # Spacer.
     COLOR_DROPDOWN()
     DIV {},
       flex: '0 0 10px'
       BUTTON {},
-        id: 'pin_button'
         onClick: pin_current_note
+        '📌'
+
+dom.SPACED_REPETITION_CONTROLS = ->
+  DIV {},
+    display: 'flex'
+    id: 'spaced_repetition_controls_container'
+    if state['ls/spaced_repetition_active']
+      num_unrated = num_unrated_notes()
+      DIV {},
+        BUTTON '🌝', onClick: -> state['ls/spaced_repetition_active'] = false
+        BUTTON '⓪', onClick: -> score_note 0
+        BUTTON '①', onClick: -> score_note 1
+        BUTTON '②', onClick: -> score_note 2
+        BUTTON '③', onClick: -> score_note 3
+        BUTTON '④', onClick: -> score_note 4
+        BUTTON '⑤', onClick: -> score_note 5
+        BUTTON '➡', onClick: -> score_note null
+        if num_unrated > 0 then " (#{num_unrated} new)"
+    else
+      BUTTON '🌚', onClick: -> state['ls/spaced_repetition_active'] = true 
 
 dom.COLOR_DROPDOWN = ->
   DIV {},
@@ -128,10 +121,17 @@ dom.COLOR_DROPDOWN = ->
 
 dom.NOTE_CONTAINER = ->
   DIV {},
-    id: 'note_container'
+    margin: 'auto'
+    width: '400px'
+    border: '1px solid gray'
+    padding: '10px'
+    borderRadius: '5px'
+    marginTop: '5px'
     backgroundColor: get_color_values note_color()
     DIV {},
-      id: 'note_title'
+      fontSize: 'large'
+      fontWeight: 'bold'
+      fontFamily: 'Futura'
       A {},
         textDecoration: 'none'
         href: encode_obsidian_link()
@@ -139,17 +139,29 @@ dom.NOTE_CONTAINER = ->
       ' ' + note_title()
     BR()
     DIV {},
-      id: 'note_text'
+      fontSize: 'small'
+      fontFamily: 'Verdana'
+      whiteSpace: 'pre-wrap'
       current_note_text()
 
 dom.TAGS_CONTAINER = ->
   DIV {},
-    id: 'tags_container'
+    margin: 'auto'
+    width: '400px'
     DIV {},
-      id: 'tags_text'
+      fontSize: 'medium'
+      fontFamily: 'Verdana'
       'Tags:'
       UL {},
-        LI "#{k}: #{v}" for k, v of current_note_headers()
+        (RECURSIVE_BULLETS k: k, v: v) for k, v of current_note_headers()
+
+dom.RECURSIVE_BULLETS = (k, v) ->
+  if v? and typeof v == 'object'
+    LI "#{k}:",
+    UL {},
+      (RECURSIVE_BULLETS k:_k, v:_v) for _k, _v of v
+  else
+    LI "#{k}: #{v}"
 
 dom.SHELF_ENTRY = (note_key) ->
   DIV {},
@@ -165,12 +177,12 @@ dom.SHELF_ENTRY = (note_key) ->
 
 # Logic
 
+random_choice = (list) ->
+  list[Math.floor(Math.random() * list.length)]
+
 request_random_note = ->
-  bus.fetch_once('/all_notes', (obj) ->
-    options = obj.list
-    note_key = options[Math.floor(Math.random() * options.length)]
-    request_specific_note note_key
-  )
+  bus.fetch_once '/all_notes', (all_notes) ->
+    request_specific_note random_choice all_notes.list
 
 request_specific_note = (note_key) ->
   bus.save
@@ -244,71 +256,6 @@ remove_from_yaml_list = (key, del_val, note_obj=null) ->
 read_header = (raw_md, key) ->
   unpack_yaml_headers(raw_md).params[key]
 
-answer_metadata_question = (answer) ->
-  mq = bus.fetch current_metadata_question_key()
-  if mq.type != 'bool'
-    console.log("Labeling metadata of type #{mq.type} not yet implemented.")
-    return
-  else  # it's a bool!
-    if answer
-      add_to_yaml_list 'tags', mq.short_label
-    else
-      remove_from_yaml_list 'tags', mq.short_label
-
-  # Advance labeling_queue
-  mq = bus.fetch(current_metadata_question_key())
-  mq.labeling_queue = remove_by_val mq.labeling_queue, current_note_key()
-
-  all_notes_list = bus.fetch('/all_notes').list
-  until mq.labeling_queue.length == 0 or mq.labeling_queue[0] in all_notes_list
-    # Note at front of queue has been deleted; remove it from queue.
-    # TODO: replace by logic on note deletion to handle this.
-    mq.labeling_queue = mq.labeling_queue.slice(1)
-  if mq.labeling_queue.length > 0
-    request_specific_note mq.labeling_queue[0]
-  bus.save(mq)
-
-delete_metadata_question = (mq_key, wipe_from_md=true) ->
-  short_label = bus.fetch(mq_key).short_label
-  if short_label == current_mq_short_label()
-    set_metadata_question NULL
-
-  bus.delete mq_key
-  if wipe_from_md
-    bus.fetch_once '/all_notes', (all_notes) ->
-      all_notes.list.forEach (note_key) ->
-        bus.fetch_once note_key, (note_obj) ->
-          remove_from_yaml_list 'tags', short_label, note_obj
-
-all_metadata_question_keys = ->
-  bus.fetch('/metadata_questions').list
-current_metadata_question_key = ->
-  bus.fetch('ls/current_metadata_question_key').mq_key
-current_mq_short_label = ->
-  mq_key = current_metadata_question_key()
-  if mq_key == NULL then NULL else bus.fetch(mq_key).short_label
-num_to_label = ->
-  mq_key = current_metadata_question_key()
-  if mq_key == NULL then 0 else bus.fetch(mq_key).labeling_queue.length
-set_metadata_question = (mq_key) ->
-  bus.save
-    key: 'ls/current_metadata_question_key'
-    mq_key: mq_key
-set_metadata_question_by_label = (mq_label) ->
-  if mq_label == NULL
-    set_metadata_question(NULL)
-  else
-    set_metadata_question(MQ_KEY_PREFIX + mq_label)
-
-create_metadata_question = (short_label, long_question=null, type='bool') ->
-  bus.fetch_once '/all_notes', (all_notes) ->
-    bus.save
-      key: MQ_KEY_PREFIX + short_label
-      short_label: short_label
-      long_question: long_question
-      type: type
-      labeling_queue: shuffle all_notes.list
-
 pin_current_note = -> pin_note current_note_key()
 
 pin_note = (note_key) ->
@@ -331,24 +278,98 @@ encode_obsidian_link = ->
   file = encodeURIComponent(current_note().location)
   "obsidian://open?vault=#{vault}&file=#{file}"
 
-# Utils
+# Spaced Repetition
 
-# Edited from https://coffeescript-cookbook.github.io/ to not modify `source`.
-shuffle = (source) ->
-  copy = [...source]
-  if source.length < 2 then return copy
-  for index in [copy.length-1..1]
-    randomIndex = Math.floor Math.random() * (index + 1)
-    [copy[index], copy[randomIndex]] = [copy[randomIndex], copy[index]]
-  copy
+ONE_DAY = 1000 * 60 * 60 * 24
 
-remove_by_val = (arr, val) -> arr.filter((v) -> v != val)
+initialize_sm2_params = (note_obj, force=false) ->
+  {params, content} = unpack_yaml_headers note_obj.content
+  if not force and (params.sm2? or not note_obj.content?) then return note_obj
+  params.sm2 =
+    vf: 2.5
+    num_reps: 1
+    interval: ONE_DAY
+    next_rep: new Date(new Date().getTime() + ONE_DAY).toString()
+  note_obj.content = repack_yaml_headers params, content
+  bus.save note_obj
+  note_obj
+
+iterate_sm2_algo = (sm2_params, v_score) ->
+  if sm2_params.num_reps == 0
+    sm2_params.interval = ONE_DAY
+  else if sm2_params.num_reps == 1
+    sm2_params.interval = 6 * ONE_DAY
+  else
+    sm2_params.interval *= sm2_params.vf
+  sm2_params.num_reps += 1
+
+  if v_score?
+    sm2_params.vf = sm2_params.vf + (0.1 - v_score * (0.08 + v_score * 0.02))
+    if sm2_params.vf < 1.3 then sm2_params.vf = 1.3
+
+    if v_score >= 3
+      sm2_params.num_reps = 0
+
+  sm2_params.next_rep = 
+    new Date(new Date().getTime() + sm2_params.interval).toString()
+  
+  sm2_params
+
+request_next_note = (excluding=null) ->
+  soonest =
+    note_keys: []
+    day: Infinity
+  bus.fetch_once '/all_notes', (all_notes) ->
+    count = remaining: all_notes.list.length
+    all_notes.list.forEach (note_key) ->
+      if excluding == note_key then count.remaining--
+      else bus.fetch_once note_key, (note_obj) ->
+        initialize_sm2_params note_obj
+        {params, content} = unpack_yaml_headers note_obj.content
+        # Group notes scheduled for the same day.
+        note_day = new Date(params.sm2?.next_rep).getTime() // ONE_DAY
+        if note_day == soonest.day
+          soonest.note_keys.push note_key
+        else if note_day < soonest.day
+          soonest.note_keys = [note_key]
+          soonest.day = note_day
+        if --count.remaining <= 0
+          # Pick a random note among the ones scheduled for the soonest day.
+          request_specific_note random_choice soonest.note_keys
+
+score_note = (v_score) ->
+  note_key = current_note_key()
+  request_next_note note_key
+  bus.fetch_once note_key, (note_obj) ->
+    if not (0 <= v_score <= 5)  # v_score is out of bounds or NaN.
+      # Incidentally, 0 <= null evaluates to true; this handles the null case.
+      throw new Error("Invalid v_score submitted: #{v_score}")
+
+    initialize_sm2_params note_obj
+
+    {params, content} = unpack_yaml_headers note_obj.content
+    params.sm2 = iterate_sm2_algo params.sm2, v_score
+    note_obj.content = repack_yaml_headers params, content
+
+    # Save the rating for future reference.
+    note_obj.v_rating_history ?= []
+    note_obj.v_rating_history.push
+      date: new Date().toString()
+      v_score: v_score
+
+    bus.save note_obj
+
+num_unrated_notes = ->
+  unrated = count: 0
+  bus.fetch('/all_notes').list.forEach (note_key) ->
+    note_obj = bus.fetch note_key
+    if not note_obj.v_rating_history then unrated.count++
+  unrated.count
 
 # Execution
 
 init_state = ->
   if not current_note_key()? then request_random_note()
-  if not current_metadata_question_key()? then set_metadata_question NULL
   state['ls/shelf'] ?= []
 
 init_state()

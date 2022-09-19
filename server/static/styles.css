@@ -1,78 +1,18 @@
-.flex_container {
-	display: flex;
-}
-
-#main_container {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	width: 100%;
-}
-
-#side_panel {
-	/*border: 1px solid gray;*/
-	flex-basis: 200px;
-	border-right: 1px solid gray;
-	flex-grow: 1;
-	flex-shrink: 1;
-	word-wrap: break-word;
-}
-
-#shuffle_area {
-	/*border: 1px solid red;*/
-	flex-grow: 5;
-	flex-shrink: 5;
-	padding: 10px;
-}
-
-#note_title {
-	font-size: large;
-	font-weight: bold;
-	font-family: Futura;
-}
-
-#note_container {
-	margin: auto;
-	width: 400px;
-	border: 1px solid gray;
-	padding: 10px;
-	border-radius: 5px;
-}
-
-#note_text {
-	font-family: Verdana;
-	font-size: small;
-	white-space: pre-wrap;
-}
-
-#tags_container {
-	margin: auto;
-	width: 300px;
-}
-
-#tags_text {
-	font-family: Verdana;
-	font-size: medium;
-}
-
-#button_container {
-	/*border:  1px solid green;*/
-	margin: auto;
-	width: 400px;
-}
-
 button {
 	border: 0px;
 	background-color: transparent;
 	background-size: 20px 20px;
 	height: 20px;
 	width: 20px;
+	padding: 0;
+	line-height: 24px;
+	text-align: center;
 }
 
-#shuffle_button {
-	background-image: url('https://cdn4.iconfinder.com/data/icons/ionicons/512/icon-shuffle-512.png');	
+#spaced_repetition_controls_container button {
+	background-color: #FEF388;
 }
 
-#pin_button {
-	background-image: url('https://icons.iconarchive.com/icons/paomedia/small-n-flat/256/pin-icon.png');
+#spaced_repetition_controls_container button:hover {
+	background-color: #D6FD9D;
 }

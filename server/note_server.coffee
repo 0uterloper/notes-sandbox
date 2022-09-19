@@ -1,13 +1,17 @@
 jsyaml = require 'js-yaml'
+path = require 'path'
 bus = require('statebus').serve
   port: 3006
 
-bus.http.use('/static', require('express').static('static'))
+bus.http.use '/static', require('express').static('static')
+bus.http.get '/', (req, res) -> res.redirect '/shufflenotes'
+bus.http.get '/shufflenotes',
+  (req, res) -> res.sendFile path.join __dirname, '/client/shufflenotes.html'
 
 FRONTMATTER_PATTERN = /^---\n(?:.*\n)*---\n/
 
-slash = (key) -> '/' + key
-deslash = (key) -> key.slice(1)
+slash = (key) -> if key[0] == '/' then key else '/' + key
+deslash = (key) -> if key[0] == '/' then key.slice(1) else key
 
 initialize_key_list = (key) ->
   bus.fetch key, (obj) ->
@@ -27,29 +31,20 @@ remove_key_by_value = (list_key, delete_key) ->
 
 # Logic ~copied from shufflenotes.coffee.
 # TODO: Move this to a utils/common file to remove the duplication.
-get_yaml_headers = (raw_md) ->
-  has_frontmatter = FRONTMATTER_PATTERN.test raw_md
+unpack_yaml_headers = (raw_md) ->
+  has_frontmatter = FRONTMATTER_PATTERN.test(raw_md)
   if has_frontmatter
-    jsyaml.load raw_md.slice('---\n'.length, raw_md.indexOf '\n---')
-  else {}
+    content_index = raw_md.indexOf('\n---')
+    {params: jsyaml.load(raw_md.slice('---\n'.length, content_index)),
+     content: raw_md.slice(content_index + '\n---'.length).trimStart()}
+  else
+    {params: {}, content: raw_md}
 
-move_to_graveyard_and_add_labeled_notes = (delete_key) ->
-  bus.fetch_once delete_key, (mq_obj) ->
-    if not mq_obj.short_label?
-      return  # No MQ in DB for this key.
-    # Copy to metadata graveyard
-    mq_obj.key = 'dead_metadata_question/' + mq_obj.short_label
-    delete mq_obj.labeling_queue
-    mq_obj.labeled_notes = []
-    bus.save mq_obj
-    bus.fetch_once 'all_notes', (all_notes) ->
-      all_notes.list.forEach (note_key) ->
-        bus.fetch_once deslash note_key, (note_obj) ->
-          if mq_obj.type == 'bool'
-            tags = get_yaml_headers(note_obj.content).tags
-            if tags? and tags.includes mq_obj.short_label
-              mq_obj.labeled_notes.push note_key
-              bus.save mq_obj
+repack_yaml_headers = (params, content) ->
+  if Object.keys(params).length == 0 then content
+  else
+    frontmatter = jsyaml.dump params
+    '---\n' + frontmatter + '---\n\n' + content
 
 manage_list_of_keys = (key_pattern, list_key,
                        save_handlers=null, delete_handlers=null) ->
@@ -64,6 +59,3 @@ manage_list_of_keys = (key_pattern, list_key,
     t.done()
 
 manage_list_of_keys 'note/*', 'all_notes'
-manage_list_of_keys 'metadata_question/*', 'metadata_questions', null,
-  [move_to_graveyard_and_add_labeled_notes]
-manage_list_of_keys 'dead_metadata_question/*', 'metadata_graveyard'
