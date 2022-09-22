@@ -1,4 +1,3 @@
-jsyaml = require 'js-yaml'
 path = require 'path'
 bus = require('statebus').serve
   port: 3006
@@ -7,8 +6,6 @@ bus.http.use '/static', require('express').static('static')
 bus.http.get '/', (req, res) -> res.redirect '/shufflenotes'
 bus.http.get '/shufflenotes',
   (req, res) -> res.sendFile path.join __dirname, '/client/shufflenotes.html'
-
-FRONTMATTER_PATTERN = /^---\n(?:.*\n)*---\n/
 
 slash = (key) -> if key[0] == '/' then key else '/' + key
 deslash = (key) -> if key[0] == '/' then key.slice(1) else key
