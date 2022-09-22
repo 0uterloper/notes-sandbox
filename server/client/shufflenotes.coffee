@@ -31,6 +31,7 @@ dom.MAIN_CONTAINER = ->
     position: 'absolute'
     top: 0
     bottom: 0
+    left: 0
     width: '100%'
     display: 'flex'
     SIDE_PANEL()
